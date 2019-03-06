@@ -1,0 +1,28 @@
+./test.sh -C ~/Games/wrapper/config/Limbo.cfg
+./test.sh -C ~/Games/wrapper/config/Limbo.cfg =pwd
+./test.sh -C ~/Games/wrapper/config/Limbo.cfg pwd
+./test.sh -C ~/Games/wrapper/Limbo.cfg
+./test.sh -G Factorio
+./test.sh -G Factorio ./bin/x64/factorio
+./test.sh -G Infinifactory
+./test.sh -G Infinifactory /bin/pwd
+./test.sh -G KSP "/home/eric/.steam/steam/steamapps/common/Kerbal Space Program/KSP.x86_64"
+./test.sh -G Limbo
+./test.sh -G Limbo =pwd
+./test.sh -G Limbo pwd
+./test.sh -G Ori
+./test.sh -G OriDE
+./test.sh -G SpaceChem
+./test.sh -G SpaceChem /bin/pwd
+./test.sh -G SpaceChem /bin/pwd; cat wrapper/logs/SpaceChem.log
+./test.sh -G SpaceChem pwd
+./test.sh -G StardewValley "/home/eric/.local/share/Steam/steamapps/common/Stardew Valley/StardewValley STEAM_RUNTIME=0"
+./test.sh -G StardewValley "/home/eric/.local/share/Steam/steamapps/common/Stardew Valley/StardewValley" STEAM_RUNTIME=0
+./test.sh -G StardewValley -- /home/eric/.local/share/Steam/steamapps/common/Stardew Valley/StardewValley STEAM_RUNTIME=0
+./test.sh -G StardewValley /home/eric/.local/share/Steam/steamapps/common/Stardew Valley/StardewValley STEAM_RUNTIME=0
+./test.sh -G TorchlightII "/home/eric/.local/share/Steam/steamapps/common/Torchlight II/ModLauncher.bin.x86_64"
+./test.sh -G TorchlightII "/home/eric/.local/share/Steam/steamapps/common/Torchlight II/Torchlight2.bin.x86_64"
+./test.sh -G TorchlightII "/home/eric/.local/share/Steam/steamapps/common/Torchlight II/TorchlightII.bin.x86_64"
+./test.sh -n -G Factorio
+./test.sh pwd
+./test.sh /usr/bin/pwd

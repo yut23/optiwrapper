@@ -1,0 +1,60 @@
+CMD:
+  - None
+  - ''
+  - 'echo'
+  - '/usr/bin/echo'
+  - '...doesnotexist'
+  - '/does/not/exist'
+  - '/tmp/path with spaces/'
+ARGS:
+  - None
+  - ''
+  - '()'
+  - 'needs parens'
+  - '(with parens)'
+  - '("I have" "internal spaces")'
+GAME:
+  - None
+  - ''
+  - 'TestGame'
+  - 'NonExistentGame'
+LOGFILE:
+  - None
+  - '/tmp/log/test_log.log'
+  - 'test_log.log'
+USE_GPU:
+  - y
+  - n
+  - invalid
+FALLBACK:
+  - y
+  - n
+  - invalid
+PRIMUS:
+  - y
+  - n
+  - invalid
+VSYNC:
+  - y
+  - n
+  - invalid
+HIDE_TOP_BAR:
+  - y
+  - n
+  - invalid
+PROC_NAME:
+  - None
+  - ''
+  - 'foobar'
+STOP_XCAPE:
+  - y
+  - n
+  - invalid
+WINDOW_NAME:
+  - None
+  - ''
+  - 'window_name'
+WINDOW_CLASSNAME:
+  - None
+  - ''
+  - 'window_classname'
