@@ -221,7 +221,7 @@ case "$1" in
     GAME="$2"
     if [[ -e $WRAPPER_DIR/config/$GAME.cfg ]] ; then
       CONFIG_FILE="$WRAPPER_DIR/config/$GAME.cfg"
-    else
+    elif [[ -z ${CONFIG_FILE+x} ]]; then
       error "The configuration file for \"$GAME\" was not found in $WRAPPER_DIR/config/."
       exit 1
     fi
@@ -344,6 +344,12 @@ optirun_cmd() {
   fi
 }
 
+if [[ -n "${LD_PRELOAD+x}" ]]; then
+  export LD_PRELOAD=${LD_PRELOAD/\/home\/eric\/.local\/share\/Steam\/ubuntu12_32\/gameoverlayrenderer.so/}
+  LD_PRELOAD=${LD_PRELOAD/::/:/}
+  debug "Fixed LD_PRELOAD: $LD_PRELOAD"
+fi
+
 OPTIRUN=$(optirun_cmd)
 debug "full command: $OPTIRUN \"${CMD}\" ${ARGS[*]}"
 
@@ -459,18 +465,27 @@ if [[ $CAN_TRACK_FOCUS == y ]] ; then
 
   # if PROC_NAME was configured (only used if we started a launcher instead of the actual game)
   if [[ -n ${PROC_NAME:+x} ]] ; then
-    # wait for the executable to start
-    sleep 20
-    #script_pid=$$
-    #echo "pgrep output: $(pgrep -f "$PROC_NAME" | grep -v "$script_pid")"
-    game_pid=$(pgrep "$PROC_NAME")
+    count=0
+    while [[ count -lt 10 ]]; do
+      # wait for the executable to start
+      sleep 2
+      #echo "pgrep output: $(pgrep -fa "$PROC_NAME")"
+      #echo "filtered output: $(pgrep -fa "$PROC_NAME" | grep -vE "$script_pid|$0")"
+      if game_pid=$(pgrep "$PROC_NAME"); then
+        if [[ -n $game_pid ]]; then
+          debug "Game PID: $game_pid"
+          break
+        fi
+      fi
+      (( count++ ))
+    done
+
     if [[ -z $game_pid ]] ; then
       error "Game PID was not found with \"pgrep -f $PROC_NAME\""
       error "Script exiting, since it won't know when to stop managing xcape (and taking up CPU cycles)"
       notify --error "Failed to find game PID, quitting"
       exit 1
     fi
-    debug "Game PID: $game_pid"
   else
     game_pid=$optirun_pid
   fi

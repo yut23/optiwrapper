@@ -4,11 +4,21 @@ Wrapper script to run games with Optimus, turn off xcape while focused, log
 playtime, and more.
 """
 
+# Feature parity with wrapper.sh
+# ------------------------------
+#
+# To do:
+# * handle FALLBACK
+
+
 import argparse
+import atexit
 import configparser
+import enum
 import logging
 import os
 import shlex
+import signal
 import subprocess
 import sys
 import threading
@@ -16,9 +26,18 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, Union, cast
 
-from lib import myxdo, search_windows, watch_focus
+import arrow  # type: ignore
+from proc.core import Process  # type: ignore
+
+import gnome_shell_ext as gse
+from lib import myxdo, pgrep, search_windows, watch_focus
 
 ConfigDict = Mapping[str, Union[None, str, List[str], bool, Path]]
+
+
+# constants
+WINDOW_WAIT_TIME = 20
+PROCESS_WAIT_TIME = 20
 
 
 # logging
@@ -27,9 +46,11 @@ logger = logging.getLogger("optiwrapper")  # pylint: disable=invalid-name
 logger.setLevel(logging.WARN)
 logger.propagate = False
 LOGFILE_FORMATTER = logging.Formatter(
-    "{asctime:s} |{levelname:^10s}| {message:s}", style="{"
+    "{asctime:s} | {levelname:.1s}:{name:s}: {message:s}", style="{"
 )
 LOGFILES: Set[str] = set()
+
+TIME_LOGFILE = None
 
 
 # constants
@@ -106,6 +127,15 @@ CONFIG_OPTIONS = {
 CONFIG_DEFAULTS: Dict[str, Any] = {
     dest: default for dest, type_, default in CONFIG_OPTIONS.values()
 }
+
+
+class Event(enum.Enum):
+    # pylint: disable=missing-docstring
+    START = enum.auto()
+    STOP = enum.auto()
+    UNFOCUS = enum.auto()
+    FOCUS = enum.auto()
+    DIE = enum.auto()
 
 
 def format_config(options: Mapping[str, Any]) -> str:
@@ -256,19 +286,25 @@ def get_config(args: argparse.Namespace) -> ConfigDict:
     # pylint: disable=redefined-outer-name
     config = CONFIG_DEFAULTS.copy()
 
-    # parse game config file, then explicit configuration file, then arguments
+    # order of configuration precedence, from highest to lowest:
+    #  1. command line parameters (<command>, --hide-top-bar, --no-discrete)
+    #  2. explicit configuration file (--configfile)
+    #  3. game configuration file (--game)
+
+    # parse game config file
     if args.game is not None:
         try:
             with open(WRAPPER_DIR / "config" / (args.game + ".cfg")) as file:
                 config_data = file.read()
+            config.update(parse_config_file(config_data))
         except OSError:
-            logger.error(
-                'The configuration file for "%s" was not found in %s.',
-                args.game,
-                WRAPPER_DIR / "config",
-            )
-            sys.exit(1)
-        config.update(parse_config_file(config_data))
+            if args.configfile is None:
+                logger.error(
+                    'The configuration file for "%s" was not found in %s.',
+                    args.game,
+                    WRAPPER_DIR / "config",
+                )
+                sys.exit(1)
         config["game"] = args.game
 
     # check for explicit config file
@@ -281,7 +317,7 @@ def get_config(args: argparse.Namespace) -> ConfigDict:
     if config["logfile"] is not None:
         setup_logfile(config["logfile"])
 
-    # command
+    # check arguments
     if args.command is not None:
         # print('cli command:', args.command)
         if len(args.command) >= 1:
@@ -306,33 +342,111 @@ def construct_command_line(options: ConfigDict) -> List[str]:
     Constructs a full command line from a configuration
     """
     cmd_args: List[str] = []
-    if not options["use_gpu"]:
-        return cmd_args
-    if options["use_primus"] and not options["force_vsync"]:
-        cmd_args.extend("env vblank_mode=0".split())
-    cmd_args.append("optirun")
-    if logger.level == logging.DEBUG:
-        cmd_args.append("--debug")
-    if options["use_primus"]:
-        cmd_args.extend("-b primus".split())
+    if options["use_gpu"] and os.environ.get("NVIDIA_XRUN") is None:
+        if options["use_primus"] and not options["force_vsync"]:
+            cmd_args.extend("env vblank_mode=0".split())
+        cmd_args.append("optirun")
+        if logger.level == logging.DEBUG:
+            cmd_args.append("--debug")
+        if options["use_primus"]:
+            cmd_args.extend("-b primus".split())
     cmd_args.append(str(options["cmd"]))
     if options["args"] is not None:
         cmd_args.extend(cast(List[str], options["args"]))
     return cmd_args
 
 
+def log_time(event: Event) -> None:
+    """
+    Writes a message to the time logfile, if one exists.
+    """
+    if TIME_LOGFILE is not None:
+        message = {
+            Event.START: "game started",
+            Event.STOP: "game stopped",
+            Event.UNFOCUS: "user left",
+            Event.FOCUS: "user returned",
+            Event.DIE: "wrapper died",
+        }[event]
+
+        timestamp = arrow.now().format("YYYY-MM-DDTHH:mm:ss.SSSZZ")
+        with open(TIME_LOGFILE, "w+") as logfile:
+            logfile.write(f"{timestamp}: {message}\n")
+
+
+class WrapperActions:
+    """
+    Holds callbacks for game management events.
+    """
+
+    def __init__(self, cfg: ConfigDict):
+        self.hide_top_bar = cfg["hide_top_bar"]
+        self.xcape_procs: List[Process] = list()
+        if cfg["stop_xcape"]:
+            self.xcape_procs = pgrep("xcape")
+
+        self.logger = logging.getLogger("optiwrapper.action")
+
+    def _try_pause_xcape(self) -> None:
+        for xcape_proc in self.xcape_procs:
+            xcape_proc.suspend()
+
+    def _try_resume_xcape(self) -> None:
+        for xcape_proc in self.xcape_procs:
+            xcape_proc.resume()
+
+    def start(self) -> None:
+        """
+        To be run when the game starts.
+        """
+        logger.debug("game starting...")
+        log_time(Event.START)
+        # hide top bar
+        if self.hide_top_bar:
+            gse.enable_extension("hidetopbar@mathieu.bidon.ca")
+
+    def stop(self, killed: bool = False) -> None:
+        """
+        To be run after the game exits.
+        """
+        logger.debug("game stopped")
+        if killed:
+            log_time(Event.DIE)
+        else:
+            log_time(Event.STOP)
+        # resume xcape
+        self._try_resume_xcape()
+        # unhide top bar
+        if self.hide_top_bar:
+            gse.disable_extension("hidetopbar@mathieu.bidon.ca")
+
+    def focus(self) -> None:
+        """
+        To be run when the game window is focused.
+        """
+        logger.debug("window focused")
+        log_time(Event.FOCUS)
+        # pause xcape
+        self._try_pause_xcape()
+
+    def unfocus(self) -> None:
+        """
+        To be run when the game window loses focus.
+        """
+        logger.debug("window unfocused")
+        log_time(Event.UNFOCUS)
+        # resume xcape
+        self._try_resume_xcape()
+
+
 if __name__ == "__main__":
     # pylint: disable=invalid-name
-
-    # xTODO: remove this when done debugging in ipython
-    # for h in list(logger.handlers):
-    #     logger.removeHandler(h)
 
     # create console log handler and set level to debug, as the actual level
     # selection is done in the logger
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
-    ch.setFormatter(logging.Formatter("{levelname}: {message}", style="{"))
+    ch.setFormatter(logging.Formatter("{levelname:.1s}:{name}: {message}", style="{"))
     logger.addHandler(ch)
 
     # command line arguments
@@ -352,18 +466,22 @@ if __name__ == "__main__":
         nargs=argparse.REMAINDER,
     )
     parser.add_argument(
-        "-C", "--configfile", metavar="FILE", help="use a specific configuration file"
+        "-C",
+        "--configfile",
+        type=argparse.FileType("r"),
+        metavar="FILE",
+        help="use a specific configuration file",
     )
     parser.add_argument(
         "-G",
         "--game",
         metavar="GAME",
-        help=("specify a game " "(will search for a config file)"),
+        help=("specify a game (will search for a config file)"),
     )
     parser.add_argument(
         "-f",
         "--hide-top-bar",
-        help=("hide the top bar " "(needed for fullscreen in some games)"),
+        help=("hide the top bar (needed for fullscreen in some games)"),
         action="store_true",
         default=None,
     )
@@ -382,7 +500,7 @@ if __name__ == "__main__":
         "-o",
         "--output",
         metavar="FILE",
-        help=("log all output to a file " "(will overwrite, not append)"),
+        help=("log all output to a file (will overwrite, not append)"),
         dest="outfile",
     )
     parser.add_argument("-c", "--classname", help="window classname to match against")
@@ -404,11 +522,6 @@ if __name__ == "__main__":
     if args.outfile is not None:
         setup_logfile(args.outfile)
 
-    # order of configuration precedence, from highest to lowest:
-    #  1. command line parameters (<command>, --hide-top-bar, --no-discrete)
-    #  2. explicit configuration file (--configfile)
-    #  3. game configuration file (--game)
-
     config = get_config(args)
 
     cfg_err_msg = check_config(config)
@@ -420,20 +533,21 @@ if __name__ == "__main__":
         print(dump_test_config(config))
         sys.exit(0)
 
-    print(args.use_gpu)
-
     logger.debug("\n%s", format_config(config))
 
-    # run command
+    # setup time logging
+    if config["game"] is not None:
+        TIME_LOGFILE = WRAPPER_DIR / "time/{}.log".format(config["game"])
+        # create directory if it doesn't exist
+        TIME_LOGFILE.parent.mkdir(parents=True, exist_ok=True)
+
+    # xTODO: check if discrete GPU works, notify if not
+
+    # setup command
     command = construct_command_line(config)
     logger.debug("Command: %s", repr(command))
 
-    # xcape_pid = int(subprocess.run('pgrep xcape'.split(), capture_output=True).stdout)
-    # print('Pausing xcape...')
-    # os.kill(xcape_pid, signal.SIGSTOP)
-    # input()
-    # print('Resuming xcape...')
-    # os.kill(xcape_pid, signal.SIGCONT)
+    actions = WrapperActions(config)
 
     """
     Now that we have arguments, we need to do the actual wrapper stuff.
@@ -443,22 +557,65 @@ if __name__ == "__main__":
         find window
     """
 
+    def cb_signal_handler(signum, frame):
+        """
+        Write a message to both logs, then die.
+        """
+        actions.stop(killed=True)
+        logger.error("Killed by external signal %d", signum)
+        sys.exit(1)
+
+    # clean up when killed by a signal
+    signal.signal(signal.SIGTERM, cb_signal_handler)
+    signal.signal(signal.SIGINT, cb_signal_handler)
+    atexit.register(actions.stop)
+    actions.start()
+
+    # run command
     proc = subprocess.Popen(command)
-    if "window_class" in config or "window_title" in config:
+    if config["window_class"] is not None or config["window_title"] is not None:
         kwargs: Dict[str, Union[bool, int, str]] = {"only_visible": True}
-        if "window_title" in config:
+        if config["window_title"] is not None:
             kwargs["winname"] = cast(str, config["window_title"])
-        if "window_class" in config:
+        if config["window_class"] is not None:
             kwargs["winclassname"] = "^" + cast(str, config["window_class"]) + "$"
         xdo = myxdo.xdo_new(None)
         wins = search_windows(xdo, **kwargs)  # type: ignore
+        start_time = time.time()
         while not wins:
+            if time.time() > start_time + WINDOW_WAIT_TIME:
+                logger.error("Window not found within {} seconds")
+                sys.exit(1)
             time.sleep(0.5)
             wins = search_windows(xdo, **kwargs)  # type: ignore
         myxdo.xdo_free(xdo)
         logger.debug("found window(s): %s", str(wins))
         focus_thread = threading.Thread(
-            target=watch_focus, daemon=True, args=(wins, print, print)
+            target=watch_focus,
+            daemon=True,
+            args=(wins, lambda evt: actions.focus(), lambda evt: actions.unfocus()),
         )
         focus_thread.start()
-    proc.wait()
+
+    if config["proc_name"] is None:
+        # just wait for subprocess to finish
+        proc.wait()
+    else:
+        # find process
+        pattern = cast(str, config["proc_name"])
+        start_time = time.time()
+        procs = pgrep(pattern)
+        while len(procs) != 1:
+            if time.time() > start_time + PROCESS_WAIT_TIME:
+                logger.error("Process not found within {} seconds")
+                sys.exit(1)
+            procs = pgrep(pattern)
+            if len(procs) > 1:
+                logger.error("Multiple matching processes:")
+                for p in procs:
+                    logger.error("%s", p)
+                sys.exit(1)
+            time.sleep(0.5)
+
+        # found single process to wait for
+        procs[0].wait_for_process(use_spinner=False)
