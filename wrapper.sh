@@ -329,7 +329,7 @@ fi
 
 
 optirun_cmd() {
-  if [[ $USE_GPU == n || -n "$NVIDIA_XRUN" ]] ; then
+  if [[ $USE_GPU == n || -n ${NVIDIA_XRUN:+x} ]] ; then
     return
   fi
   if [[ $PRIMUS == y ]] && [[ $VSYNC == n ]] ; then
@@ -354,7 +354,7 @@ OPTIRUN=$(optirun_cmd)
 debug "full command: $OPTIRUN \"${CMD}\" ${ARGS[*]}"
 
 # check if discrete GPU works
-if [[ -z "$NVIDIA_XRUN" && $USE_GPU == y ]] && ! optirun --silent true; then
+if [[ -z "${NVIDIA_XRUN:+x}" && $USE_GPU == y ]] && ! optirun --silent true; then
   if [[ $FALLBACK == y ]]; then
     error --notify "Discrete GPU not working, falling back to integrated GPU"
     USE_GPU=n
