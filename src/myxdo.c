@@ -211,8 +211,8 @@ int _xdo_ewmh_is_supported(const xdo_t *xdo, const char *feature) {
 
 int xdo_get_desktop_for_window(const xdo_t *xdo, Window wid, long *desktop) {
   Atom type;
-  int size;
-  long nitems;
+  int size = 0;
+  long nitems = 0;
   unsigned char *data;
   Atom request;
 
@@ -381,8 +381,8 @@ static int _xdo_match_window_classname(const xdo_t *xdo, Window window,
 
 int xdo_get_pid_window(const xdo_t *xdo, Window window) {
   Atom type;
-  int size;
-  long nitems;
+  int size = 0;
+  long nitems = 0;
   unsigned char *data;
   int window_pid = 0;
 
@@ -417,8 +417,8 @@ static int _xdo_match_window_pid(const xdo_t *xdo, Window window,
 static int _xdo_match_window_steam_game(const xdo_t *xdo, Window window,
                                         const int steam_game) {
   Atom type;
-  int size;
-  long nitems;
+  int size = 0;
+  long nitems = 0;
   unsigned char *data;
   int window_steam_game = 0;
 
