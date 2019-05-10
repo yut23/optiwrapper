@@ -315,6 +315,7 @@ def watch_focus(
     corresponding callback with the specified event.
     """
     disp = display.Display()
+    focused = disp.get_input_focus().focus
 
     # subscribe to focus events on each window
     ec = error.CatchError(error.BadWindow)
@@ -326,23 +327,26 @@ def watch_focus(
         if err:
             print("Bad window ID: 0x{:x}".format(err.resource_id.id))
             return 1
+        if win == focused:
+            focus_in_cb(None)
+        else:
+            focus_out_cb(None)
 
-    focused = -1
     # main loop
     while True:
         evt = disp.next_event()
         if evt.mode not in (X.NotifyNormal, X.NotifyWhileGrabbed):
             continue
-        if evt.type == X.FocusIn and focused != evt.window.id:
+        if evt.type == X.FocusIn and focused != evt.window:
             focus_in_cb(evt)
-            focused = evt.window.id
+            focused = evt.window
         if (
             evt.type == X.FocusOut
-            and focused in (evt.window.id, -1)
+            and focused == evt.window
             and evt.detail != X.NotifyInferior
         ):
             focus_out_cb(evt)
-            focused = 0
+            focused = X.NONE
 
     return 0
 
