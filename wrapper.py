@@ -99,7 +99,7 @@ PROC_NAME: The process name, for tracking when the game has exited. Only needed
   if the initial process isn't the same as the actual game (e.g. a launcher)
 
 STOP_XCAPE [n]: Whether to disable xcape while the game is focused.
-  Requires WINDOW_NAME or WINDOW_CLASS to be specified.
+  Requires WINDOW_TITLE or WINDOW_CLASS to be specified.
 
 WINDOW_TITLE: Name of main game window (can use regular expressions)
 
@@ -185,7 +185,7 @@ def dump_test_config(options: Mapping[str, Any]) -> str:
     dump_bool("HIDE_TOP_BAR")
     dump_bool("STOP_XCAPE")
     dump_str("PROC_NAME")
-    dump_str("WINDOW_NAME")
+    dump_str("WINDOW_TITLE")
     dump_str("WINDOW_CLASS")
 
     return "\n".join(out)
@@ -370,7 +370,7 @@ def log_time(event: Event) -> None:
         }[event]
 
         timestamp = arrow.now().format("YYYY-MM-DDTHH:mm:ss.SSSZZ")
-        with open(TIME_LOGFILE, "w+") as logfile:
+        with open(TIME_LOGFILE, "a") as logfile:
             logfile.write(f"{timestamp}: {message}\n")
 
 
@@ -600,16 +600,20 @@ if __name__ == "__main__":
     if config["proc_name"] is None:
         # just wait for subprocess to finish
         proc.wait()
+        logger.debug("subprocess %d done, exiting wrapper", proc.pid)
     else:
         # find process
+        time.sleep(2)
         pattern = cast(str, config["proc_name"])
         start_time = time.time()
         procs = pgrep(pattern)
+        logger.debug("found: %s", procs)
         while len(procs) != 1:
             if time.time() > start_time + PROCESS_WAIT_TIME:
                 logger.error("Process not found within {} seconds")
                 sys.exit(1)
             procs = pgrep(pattern)
+            logger.debug("found: %s", procs)
             if len(procs) > 1:
                 logger.error("Multiple matching processes:")
                 for p in procs:
