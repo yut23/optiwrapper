@@ -118,6 +118,7 @@ CONFIG_OPTIONS = {
     "PRIMUS": ("use_primus", bool, True),
     "VSYNC": ("force_vsync", bool, False),
     "HIDE_TOP_BAR": ("hide_top_bar", bool, False),
+    "IS_32_BIT": ("is_32_bit", bool, False),
     "STOP_XCAPE": ("stop_xcape", bool, False),
     "PROC_NAME": ("proc_name", str, None),
     "WINDOW_TITLE": ("window_title", str, None),
@@ -337,14 +338,16 @@ def get_config(args: argparse.Namespace) -> ConfigDict:
     return config
 
 
-def construct_command_line(options: ConfigDict) -> List[str]:
+def construct_command_line(options: ConfigDict) -> Tuple[List[str], Dict[str, str]]:
     """
-    Constructs a full command line from a configuration
+    Constructs a full command line and environment dict from a configuration
     """
     cmd_args: List[str] = []
+    environ: Dict[str, str] = dict()
+    if options["use_primus"] and not options["force_vsync"]:
+        environ["vblank_mode"] = "0"
+        environ["__GL_SYNC_TO_VBLANK"] = "0"
     if options["use_gpu"] and os.environ.get("NVIDIA_XRUN") is None:
-        if options["use_primus"] and not options["force_vsync"]:
-            cmd_args.extend("env vblank_mode=0".split())
         cmd_args.append("optirun")
         if logger.level == logging.DEBUG:
             cmd_args.append("--debug")
@@ -353,7 +356,7 @@ def construct_command_line(options: ConfigDict) -> List[str]:
     cmd_args.append(str(options["cmd"]))
     if options["args"] is not None:
         cmd_args.extend(cast(List[str], options["args"]))
-    return cmd_args
+    return cmd_args, environ
 
 
 def log_time(event: Event) -> None:
@@ -544,18 +547,21 @@ if __name__ == "__main__":
     # xTODO: check if discrete GPU works, notify if not
 
     # setup command
-    command = construct_command_line(config)
+    command, env_override = construct_command_line(config)
     logger.debug("Command: %s", repr(command))
 
     actions = WrapperActions(config)
 
-    """
-    Now that we have arguments, we need to do the actual wrapper stuff.
-    if proc_name:
-        watch for... fork? opening a new window?
-    else:
-        find window
-    """
+    # remove 32-bit overlay library
+    if "LD_PRELOAD" in os.environ:
+        if config["is_32_bit"]:
+            bad_lib = "ubuntu12_64"
+        else:
+            bad_lib = "ubuntu12_32"
+        env_override["LD_PRELOAD"] = ":".join(
+            lib for lib in os.environ["LD_PRELOAD"].split(":") if bad_lib not in lib
+        )
+        logger.debug('Fixed LD_PRELOAD: now "%s"', env_override["LD_PRELOAD"])
 
     def cb_signal_handler(signum, frame):
         """
@@ -572,7 +578,7 @@ if __name__ == "__main__":
     actions.start()
 
     # run command
-    proc = subprocess.Popen(command)
+    proc = subprocess.Popen(command, env={**os.environ, **env_override})
     if config["window_class"] is not None or config["window_title"] is not None:
         kwargs: Dict[str, Union[bool, int, str]] = {"only_visible": True}
         if config["window_title"] is not None:

@@ -333,7 +333,7 @@ optirun_cmd() {
     return
   fi
   if [[ $PRIMUS == y ]] && [[ $VSYNC == n ]] ; then
-    printf "env vblank_mode=0 "
+    printf "env vblank_mode=0 __GL_SYNC_TO_VBLANK=0 "
   fi
   printf "optirun"
   if [[ -n $DEBUG ]] ; then
