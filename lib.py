@@ -5,6 +5,7 @@ Testing interaction with the C watch_focus program from inside python.
 # pylint: disable=invalid-name, too-few-public-methods, too-many-arguments
 # pylint: disable=too-many-instance-attributes, too-many-locals
 
+import logging
 import os
 import sys
 from ctypes import (
@@ -24,6 +25,10 @@ from typing import Callable, Iterable, List, Optional
 
 from proc.core import Process, find_processes  # type: ignore
 from Xlib import X, display, error  # type: ignore
+
+logger = logging.getLogger("optiwrapper")  # pylint: disable=invalid-name
+
+running = True
 
 myxdo = CDLL("/home/eric/Games/wrapper/myxdo.so")
 
@@ -321,32 +326,40 @@ def watch_focus(
     ec = error.CatchError(error.BadWindow)
     for window_id in window_ids:
         win = disp.create_resource_object("window", window_id)
-        win.change_attributes(event_mask=X.FocusChangeMask, onerror=ec)
+        win.change_attributes(
+            event_mask=X.FocusChangeMask | X.StructureNotifyMask, onerror=ec
+        )
         disp.sync()
         err = ec.get_error()
         if err:
-            print("Bad window ID: 0x{:x}".format(err.resource_id.id))
-            return 1
+            logger.error("Bad window ID: 0x{:x}".format(err.resource_id.id))
+            return -1
         if win == focused:
             focus_in_cb(None)
         else:
             focus_out_cb(None)
 
     # main loop
-    while True:
+    while running:
         evt = disp.next_event()
-        if evt.mode not in (X.NotifyNormal, X.NotifyWhileGrabbed):
-            continue
-        if evt.type == X.FocusIn and focused != evt.window:
-            focus_in_cb(evt)
-            focused = evt.window
-        if (
-            evt.type == X.FocusOut
-            and focused == evt.window
-            and evt.detail != X.NotifyInferior
-        ):
-            focus_out_cb(evt)
-            focused = X.NONE
+        if not running:
+            break
+        if evt.type == X.DestroyNotify:
+            logger.debug("window destroyed: 0x%x", evt.window.id)
+            return int(evt.window.id)
+        if isinstance(evt, display.event.Focus):
+            if evt.mode not in (X.NotifyNormal, X.NotifyWhileGrabbed):
+                continue
+            if evt.type == X.FocusIn and focused != evt.window:
+                focus_in_cb(evt)
+                focused = evt.window
+            if (
+                evt.type == X.FocusOut
+                and focused == evt.window
+                and evt.detail != X.NotifyInferior
+            ):
+                focus_out_cb(evt)
+                focused = X.NONE
 
     return 0
 

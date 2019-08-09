@@ -4,12 +4,6 @@ Wrapper script to run games with Optimus, turn off xcape while focused, log
 playtime, and more.
 """
 
-# Feature parity with wrapper.sh
-# ------------------------------
-#
-# To do:
-# * handle FALLBACK
-
 
 import argparse
 import atexit
@@ -26,13 +20,15 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, Union, cast
 
-import arrow  # type: ignore
-from proc.core import Process  # type: ignore
+import arrow
+import notify2
+from proc.core import Process
 
 import gnome_shell_ext as gse
+import lib
 from lib import myxdo, pgrep, search_windows, watch_focus
 
-ConfigDict = Mapping[str, Union[None, str, List[str], bool, Path]]
+ConfigDict = Dict[str, Union[None, str, List[str], bool, Path]]
 
 
 # constants
@@ -217,7 +213,7 @@ def parse_config_file(data: str) -> ConfigDict:
                 return dest, vals[0]
             return dest, value
         if type_ is list:
-            if not (value.startswith("(") and value.endswith(")")):
+            if not (value and value[0] == "(" and value[-1] == ")"):
                 raise ConfigException(
                     "{} must be an array, surrounded by parens".format(option)
                 )
@@ -344,10 +340,13 @@ def construct_command_line(options: ConfigDict) -> Tuple[List[str], Dict[str, st
     """
     cmd_args: List[str] = []
     environ: Dict[str, str] = dict()
-    if options["use_primus"] and not options["force_vsync"]:
-        environ["vblank_mode"] = "0"
-        environ["__GL_SYNC_TO_VBLANK"] = "0"
-    if options["use_gpu"] and os.environ.get("NVIDIA_XRUN") is None:
+    # check if we're running under nvidia-xrun
+    if os.environ.get("NVIDIA_XRUN") is not None:
+        if not options["force_vsync"]:
+            environ["__GL_SYNC_TO_VBLANK"] = "0"
+    elif options["use_gpu"]:
+        if options["use_primus"] and not options["force_vsync"]:
+            environ["vblank_mode"] = "0"
         cmd_args.append("optirun")
         if logger.level == logging.DEBUG:
             cmd_args.append("--debug")
@@ -375,6 +374,18 @@ def log_time(event: Event) -> None:
         timestamp = arrow.now().format("YYYY-MM-DDTHH:mm:ss.SSSZZ")
         with open(TIME_LOGFILE, "a") as logfile:
             logfile.write(f"{timestamp}: {message}\n")
+
+
+def notify(msg: str, level: int = logging.INFO, log: bool = False) -> None:
+    icon = {
+        logging.INFO: "dialog-information",
+        logging.WARNING: "dialog-warning",
+        logging.ERROR: "dialog-error",
+    }.get(level, "dialog-information")
+    if log:
+        logger.log(level, msg)
+    n = notify2.Notification("optiwrapper", msg, icon)
+    n.show()
 
 
 class WrapperActions:
@@ -412,6 +423,7 @@ class WrapperActions:
         """
         To be run after the game exits.
         """
+        lib.running = False
         logger.debug("game stopped")
         if killed:
             log_time(Event.DIE)
@@ -428,7 +440,8 @@ class WrapperActions:
         To be run when the game window is focused.
         """
         logger.debug("window focused")
-        log_time(Event.FOCUS)
+        if lib.running:
+            log_time(Event.FOCUS)
         # pause xcape
         self._try_pause_xcape()
 
@@ -437,9 +450,42 @@ class WrapperActions:
         To be run when the game window loses focus.
         """
         logger.debug("window unfocused")
-        log_time(Event.UNFOCUS)
+        if lib.running:
+            log_time(Event.UNFOCUS)
         # resume xcape
         self._try_resume_xcape()
+
+
+class FocusThread(threading.Thread):
+    def __init__(self, cfg: ConfigDict):
+        super().__init__()
+        self.daemon = True
+        self.kwargs: Dict[str, Union[bool, int, str]] = {"only_visible": True}
+        if cfg["window_title"] is not None:
+            self.kwargs["winname"] = cast(str, cfg["window_title"])
+        if cfg["window_class"] is not None:
+            self.kwargs["winclassname"] = "^" + cast(str, cfg["window_class"]) + "$"
+
+    def run(self) -> None:
+        # if a window is closed, search for new matching windows again
+        closed_win = 1
+        while closed_win > 0 and lib.running:
+            xdo = myxdo.xdo_new(None)
+            wins = search_windows(xdo, **self.kwargs)  # type: ignore
+            window_start_time = time.time()
+            while not wins and lib.running:
+                if time.time() > window_start_time + WINDOW_WAIT_TIME:
+                    logger.error("Window not found within {} seconds")
+                    sys.exit(1)
+                time.sleep(0.5)
+                wins = search_windows(xdo, **self.kwargs)  # type: ignore
+            myxdo.xdo_free(xdo)
+            xdo = None
+            logger.debug("found window(s): [%s]", ", ".join(map("0x{:x}".format, wins)))
+            closed_win = watch_focus(  # type: ignore
+                wins, lambda evt: actions.focus(), lambda evt: actions.unfocus()
+            )
+            time.sleep(0.1)
 
 
 if __name__ == "__main__":
@@ -451,6 +497,9 @@ if __name__ == "__main__":
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(logging.Formatter("{levelname:.1s}:{name}: {message}", style="{"))
     logger.addHandler(ch)
+
+    # initialize notification system
+    notify2.init("optiwrapper")
 
     # command line arguments
     parser = argparse.ArgumentParser(
@@ -532,6 +581,23 @@ if __name__ == "__main__":
         logger.error(cfg_err_msg)
         sys.exit(1)
 
+    # check if discrete GPU works, notify if not
+    if (
+        config["use_gpu"]
+        and os.environ.get("NVIDIA_XRUN") is None
+        and subprocess.run(["optirun", "--silent", "true"]).returncode != 0
+    ):
+        if config["fallback"]:
+            notify(
+                "Discrete GPU not working, falling back to integrated GPU",
+                logging.ERROR,
+                True,
+            )
+            config["use_gpu"] = False
+        else:
+            notify("Discrete GPU not working, quitting", logging.ERROR, True)
+            sys.exit(1)
+
     if args.test:
         print(dump_test_config(config))
         sys.exit(0)
@@ -544,15 +610,13 @@ if __name__ == "__main__":
         # create directory if it doesn't exist
         TIME_LOGFILE.parent.mkdir(parents=True, exist_ok=True)
 
-    # xTODO: check if discrete GPU works, notify if not
-
     # setup command
     command, env_override = construct_command_line(config)
     logger.debug("Command: %s", repr(command))
 
     actions = WrapperActions(config)
 
-    # remove 32-bit overlay library
+    # remove overlay library for wrong architecture
     if "LD_PRELOAD" in os.environ:
         if config["is_32_bit"]:
             bad_lib = "ubuntu12_64"
@@ -568,6 +632,7 @@ if __name__ == "__main__":
         Write a message to both logs, then die.
         """
         actions.stop(killed=True)
+        atexit.unregister(actions.stop)
         logger.error("Killed by external signal %d", signum)
         sys.exit(1)
 
@@ -580,28 +645,8 @@ if __name__ == "__main__":
     # run command
     proc = subprocess.Popen(command, env={**os.environ, **env_override})
     if config["window_class"] is not None or config["window_title"] is not None:
-        kwargs: Dict[str, Union[bool, int, str]] = {"only_visible": True}
-        if config["window_title"] is not None:
-            kwargs["winname"] = cast(str, config["window_title"])
-        if config["window_class"] is not None:
-            kwargs["winclassname"] = "^" + cast(str, config["window_class"]) + "$"
-        xdo = myxdo.xdo_new(None)
-        wins = search_windows(xdo, **kwargs)  # type: ignore
-        start_time = time.time()
-        while not wins:
-            if time.time() > start_time + WINDOW_WAIT_TIME:
-                logger.error("Window not found within {} seconds")
-                sys.exit(1)
-            time.sleep(0.5)
-            wins = search_windows(xdo, **kwargs)  # type: ignore
-        myxdo.xdo_free(xdo)
-        logger.debug("found window(s): %s", str(wins))
-        focus_thread = threading.Thread(
-            target=watch_focus,
-            daemon=True,
-            args=(wins, lambda evt: actions.focus(), lambda evt: actions.unfocus()),
-        )
-        focus_thread.start()
+        ft = FocusThread(config)
+        ft.start()
 
     if config["proc_name"] is None:
         # just wait for subprocess to finish
@@ -611,12 +656,13 @@ if __name__ == "__main__":
         # find process
         time.sleep(2)
         pattern = cast(str, config["proc_name"])
-        start_time = time.time()
+        proc_start_time = time.time()
         procs = pgrep(pattern)
         logger.debug("found: %s", procs)
         while len(procs) != 1:
-            if time.time() > start_time + PROCESS_WAIT_TIME:
+            if time.time() > proc_start_time + PROCESS_WAIT_TIME:
                 logger.error("Process not found within {} seconds")
+                notify("Failed to find game PID, quitting", logging.ERROR)
                 sys.exit(1)
             procs = pgrep(pattern)
             logger.debug("found: %s", procs)
