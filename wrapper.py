@@ -22,9 +22,8 @@ from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, Union, cast
 
 import arrow
 import notify2
-from proc.core import Process
 
-import gnome_shell_ext as gse
+import hooks
 import lib
 from lib import myxdo, pgrep, search_windows, watch_focus
 
@@ -89,18 +88,22 @@ PRIMUS [y]: Whether to run with primus (optirun -b primus)
 
 VSYNC [y]: Whether to run primus with vblank_mode=0
 
-HIDE_TOP_BAR [n]: Whether to hide the top bar when the game is run.
+IS_32_BIT [n]: Whether the executable is 32-bit (for removing extra Steam
+  gameoverlay.so entry)
 
 PROC_NAME: The process name, for tracking when the game has exited. Only needed
   if the initial process isn't the same as the actual game (e.g. a launcher)
 
-STOP_XCAPE [n]: Whether to disable xcape while the game is focused.
-  Requires WINDOW_TITLE or WINDOW_CLASS to be specified.
-
-WINDOW_TITLE: Name of main game window (can use regular expressions)
+WINDOW_TITLE: Name of main game window (can use regular expressions). Can be
+  found through Alt-Tab menu or "xprop _NET_WM_NAME".
 
 WINDOW_CLASS: Class of main game window (must match exactly). Can be found by
   looking at the first string returned by "xprop WM_CLASS".
+
+HOOKS: Names of files to load from ~/Games/wrapper/hooks/. Common hooks:
+  hide_top_bar: Hides the top menu bar when the game is focused.
+  stop_xcape: Disables xcape (maps ctrl to escape) while the game is focused.
+  mouse_accel: Disables mouse acceleration while the game is focused.
 """
 
 
@@ -113,12 +116,11 @@ CONFIG_OPTIONS = {
     "FALLBACK": ("fallback", bool, True),
     "PRIMUS": ("use_primus", bool, True),
     "VSYNC": ("force_vsync", bool, True),
-    "HIDE_TOP_BAR": ("hide_top_bar", bool, False),
     "IS_32_BIT": ("is_32_bit", bool, False),
-    "STOP_XCAPE": ("stop_xcape", bool, False),
     "PROC_NAME": ("proc_name", str, None),
     "WINDOW_TITLE": ("window_title", str, None),
     "WINDOW_CLASS": ("window_class", str, None),
+    "HOOKS": ("hooks", list, None),
 }
 
 CONFIG_DEFAULTS: Dict[str, Any] = {
@@ -179,11 +181,10 @@ def dump_test_config(options: Mapping[str, Any]) -> str:
     dump_bool("FALLBACK")
     dump_bool("PRIMUS")
     dump_bool("VSYNC")
-    dump_bool("HIDE_TOP_BAR")
-    dump_bool("STOP_XCAPE")
     dump_str("PROC_NAME")
     dump_str("WINDOW_TITLE")
     dump_str("WINDOW_CLASS")
+    out.append("HOOKS: " + " ".join('"{:s}"'.format(hook) for hook in options["hooks"]))
 
     return "\n".join(out)
 
@@ -192,8 +193,6 @@ class ConfigException(Exception):
     """
     An error caused by an invalid configuration file.
     """
-
-    pass
 
 
 def parse_config_file(data: str) -> ConfigDict:
@@ -258,8 +257,6 @@ def check_config(cfg: ConfigDict) -> Optional[str]:
             str(cfg["cmd"])
         )
 
-    if cfg["stop_xcape"] and not (cfg["window_title"] or cfg["window_class"]):
-        return "WINDOW_TITLE or WINDOW_CLASS must be given to use STOP_XCAPE"
     return None
 
 
@@ -388,72 +385,50 @@ def notify(msg: str, level: int = logging.INFO, log: bool = False) -> None:
     n.show()
 
 
-class WrapperActions:
+def start() -> None:
     """
-    Holds callbacks for game management events.
+    To be run when the game starts.
     """
+    logger.debug("game starting...")
+    log_time(Event.START)
+    for hook in hooks.get_hooks():
+        hook.on_start()
 
-    def __init__(self, cfg: ConfigDict):
-        self.hide_top_bar = cfg["hide_top_bar"]
-        self.xcape_procs: List[Process] = list()
-        if cfg["stop_xcape"]:
-            self.xcape_procs = pgrep("xcape")
 
-        self.logger = logging.getLogger("optiwrapper.action")
+def stop(killed: bool = False) -> None:
+    """
+    To be run after the game exits.
+    """
+    lib.running = False
+    logger.debug("game stopped")
+    if killed:
+        log_time(Event.DIE)
+    else:
+        log_time(Event.STOP)
+    for hook in hooks.get_hooks():
+        hook.on_stop()
 
-    def _try_pause_xcape(self) -> None:
-        for xcape_proc in self.xcape_procs:
-            xcape_proc.suspend()
 
-    def _try_resume_xcape(self) -> None:
-        for xcape_proc in self.xcape_procs:
-            xcape_proc.resume()
+def focus() -> None:
+    """
+    To be run when the game window is focused.
+    """
+    logger.debug("window focused")
+    if lib.running:
+        log_time(Event.FOCUS)
+    for hook in hooks.get_hooks():
+        hook.on_focus()
 
-    def start(self) -> None:
-        """
-        To be run when the game starts.
-        """
-        logger.debug("game starting...")
-        log_time(Event.START)
-        # hide top bar
-        if self.hide_top_bar:
-            gse.enable_extension("hidetopbar@mathieu.bidon.ca")
 
-    def stop(self, killed: bool = False) -> None:
-        """
-        To be run after the game exits.
-        """
-        lib.running = False
-        logger.debug("game stopped")
-        if killed:
-            log_time(Event.DIE)
-        else:
-            log_time(Event.STOP)
-        # resume xcape
-        self._try_resume_xcape()
-        # unhide top bar
-        if self.hide_top_bar:
-            gse.disable_extension("hidetopbar@mathieu.bidon.ca")
-
-    def focus(self) -> None:
-        """
-        To be run when the game window is focused.
-        """
-        logger.debug("window focused")
-        if lib.running:
-            log_time(Event.FOCUS)
-        # pause xcape
-        self._try_pause_xcape()
-
-    def unfocus(self) -> None:
-        """
-        To be run when the game window loses focus.
-        """
-        logger.debug("window unfocused")
-        if lib.running:
-            log_time(Event.UNFOCUS)
-        # resume xcape
-        self._try_resume_xcape()
+def unfocus() -> None:
+    """
+    To be run when the game window loses focus.
+    """
+    logger.debug("window unfocused")
+    if lib.running:
+        log_time(Event.UNFOCUS)
+    for hook in hooks.get_hooks():
+        hook.on_unfocus()
 
 
 class FocusThread(threading.Thread):
@@ -475,15 +450,19 @@ class FocusThread(threading.Thread):
             window_start_time = time.time()
             while not wins and lib.running:
                 if time.time() > window_start_time + WINDOW_WAIT_TIME:
-                    logger.error("Window not found within {} seconds")
+                    notify(
+                        f"Window not found within {WINDOW_WAIT_TIME} seconds",
+                        logging.ERROR,
+                        log=True,
+                    )
                     sys.exit(1)
                 time.sleep(0.5)
                 wins = search_windows(xdo, **self.kwargs)  # type: ignore
             myxdo.xdo_free(xdo)
             xdo = None
             logger.debug("found window(s): [%s]", ", ".join(map("0x{:x}".format, wins)))
-            closed_win = watch_focus(  # type: ignore
-                wins, lambda evt: actions.focus(), lambda evt: actions.unfocus()
+            closed_win = watch_focus(
+                wins, lambda evt: focus(), lambda evt: unfocus()  # type: ignore
             )
             time.sleep(0.1)
 
@@ -582,21 +561,26 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # check if discrete GPU works, notify if not
-    if (
-        config["use_gpu"]
-        and os.environ.get("NVIDIA_XRUN") is None
-        and subprocess.run(["optirun", "--silent", "true"]).returncode != 0
-    ):
-        if config["fallback"]:
-            notify(
-                "Discrete GPU not working, falling back to integrated GPU",
-                logging.ERROR,
-                True,
+    if config["use_gpu"] and os.environ.get("NVIDIA_XRUN") is None:
+        try:
+            optirun_works = (
+                subprocess.run(["optirun", "--silent", "true"], check=True).returncode
+                == 0
             )
-            config["use_gpu"] = False
-        else:
-            notify("Discrete GPU not working, quitting", logging.ERROR, True)
-            sys.exit(1)
+        except FileNotFoundError:
+            optirun_works = False
+
+        if not optirun_works:
+            if config["fallback"]:
+                notify(
+                    "Discrete GPU not working, falling back to integrated GPU",
+                    logging.ERROR,
+                    True,
+                )
+                config["use_gpu"] = False
+            else:
+                notify("Discrete GPU not working, quitting", logging.ERROR, True)
+                sys.exit(1)
 
     if args.test:
         print(dump_test_config(config))
@@ -614,7 +598,10 @@ if __name__ == "__main__":
     command, env_override = construct_command_line(config)
     logger.debug("Command: %s", repr(command))
 
-    actions = WrapperActions(config)
+    # load hooks
+    hooks.register_hooks()
+    for hook_name in config["hooks"]:
+        hooks.load_hook(hook_name)
 
     # remove overlay library for wrong architecture
     if "LD_PRELOAD" in os.environ:
@@ -623,7 +610,7 @@ if __name__ == "__main__":
         else:
             bad_lib = "ubuntu12_32"
         env_override["LD_PRELOAD"] = ":".join(
-            lib for lib in os.environ["LD_PRELOAD"].split(":") if bad_lib not in lib
+            lib_ for lib_ in os.environ["LD_PRELOAD"].split(":") if bad_lib not in lib_
         )
         logger.debug('Fixed LD_PRELOAD: now "%s"', env_override["LD_PRELOAD"])
 
@@ -631,16 +618,16 @@ if __name__ == "__main__":
         """
         Write a message to both logs, then die.
         """
-        actions.stop(killed=True)
-        atexit.unregister(actions.stop)
+        stop(killed=True)
+        atexit.unregister(stop)
         logger.error("Killed by external signal %d", signum)
         sys.exit(1)
 
     # clean up when killed by a signal
     signal.signal(signal.SIGTERM, cb_signal_handler)
     signal.signal(signal.SIGINT, cb_signal_handler)
-    atexit.register(actions.stop)
-    actions.start()
+    atexit.register(stop)
+    start()
 
     # run command
     proc = subprocess.Popen(command, env={**os.environ, **env_override})
@@ -661,7 +648,7 @@ if __name__ == "__main__":
         logger.debug("found: %s", procs)
         while len(procs) != 1:
             if time.time() > proc_start_time + PROCESS_WAIT_TIME:
-                logger.error("Process not found within {} seconds")
+                logger.error("Process not found within %d seconds", PROCESS_WAIT_TIME)
                 notify("Failed to find game PID, quitting", logging.ERROR)
                 sys.exit(1)
             procs = pgrep(pattern)
