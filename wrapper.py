@@ -84,9 +84,9 @@ USE_GPU [y]: Whether to run on the discrete GPU
 
 FALLBACK [y]: Whether to run the game even if the discrete GPU is unavailable
 
-PRIMUS [y]: Whether to run with primus (optirun -b primus)
+USE_PRIMUS [y]: Whether to run with primus (optirun -b primus)
 
-VSYNC [y]: Whether to run primus with vblank_mode=0
+FORCE_VSYNC [y]: Whether to run primus with vblank_mode=0
 
 IS_32_BIT [n]: Whether the executable is 32-bit (for removing extra Steam
   gameoverlay.so entry)
@@ -114,8 +114,8 @@ CONFIG_OPTIONS = {
     "LOGFILE": ("logfile", Path, None),
     "USE_GPU": ("use_gpu", bool, True),
     "FALLBACK": ("fallback", bool, True),
-    "PRIMUS": ("use_primus", bool, True),
-    "VSYNC": ("force_vsync", bool, True),
+    "USE_PRIMUS": ("use_primus", bool, True),
+    "FORCE_VSYNC": ("force_vsync", bool, True),
     "IS_32_BIT": ("is_32_bit", bool, False),
     "PROC_NAME": ("proc_name", str, None),
     "WINDOW_TITLE": ("window_title", str, None),
@@ -179,8 +179,8 @@ def dump_test_config(options: Mapping[str, Any]) -> str:
     dump_str("GAME")
     dump_bool("USE_GPU")
     dump_bool("FALLBACK")
-    dump_bool("PRIMUS")
-    dump_bool("VSYNC")
+    dump_bool("USE_PRIMUS")
+    dump_bool("FORCE_VSYNC")
     dump_str("PROC_NAME")
     dump_str("WINDOW_TITLE")
     dump_str("WINDOW_CLASS")

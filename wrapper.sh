@@ -9,8 +9,8 @@ WRAPPER_DIR=$GAMES_DIR/wrapper
 ARGS=()
 USE_GPU=y
 FALLBACK=y
-PRIMUS=y
-VSYNC=n
+USE_PRIMUS=y
+FORCE_VSYNC=y
 HIDE_TOP_BAR=n
 STOP_XCAPE=n
 DEBUG=
@@ -61,9 +61,9 @@ USE_GPU [y]: Whether to run on the discrete GPU
 
 FALLBACK [y]: Whether to run the game even if the discrete GPU is unavailable
 
-PRIMUS [y]: Whether to run with primus (optirun -b primus)
+USE_PRIMUS [y]: Whether to run with primus (optirun -b primus)
 
-VSYNC [n]: Whether to run primus with vblank_mode=0
+FORCE_VSYNC [y]: Whether to run primus with vblank_mode=0
 
 HIDE_TOP_BAR [n]: Whether to hide the top bar when the game is run.
 
@@ -332,14 +332,14 @@ optirun_cmd() {
   if [[ $USE_GPU == n || -n ${NVIDIA_XRUN:+x} ]] ; then
     return
   fi
-  if [[ $PRIMUS == y ]] && [[ $VSYNC == n ]] ; then
+  if [[ $USE_PRIMUS == y ]] && [[ $FORCE_VSYNC == n ]] ; then
     printf "env vblank_mode=0 __GL_SYNC_TO_VBLANK=0 "
   fi
   printf "optirun"
   if [[ -n $DEBUG ]] ; then
     printf -- " --debug"
   fi
-  if [[ $PRIMUS == y ]] ; then
+  if [[ $USE_PRIMUS == y ]] ; then
     printf -- " -b primus"
   fi
 }
@@ -432,8 +432,8 @@ if [[ ${TEST:-n} == y ]]; then
   printf '\n'
   printf 'USE_GPU: "%s"\n' "$USE_GPU"
   printf 'FALLBACK: "%s"\n' "$FALLBACK"
-  printf 'PRIMUS: "%s"\n' "$PRIMUS"
-  printf 'VSYNC: "%s"\n' "$VSYNC"
+  printf 'USE_PRIMUS: "%s"\n' "$USE_PRIMUS"
+  printf 'FORCE_VSYNC: "%s"\n' "$FORCE_VSYNC"
   printf 'HIDE_TOP_BAR: "%s"\n' "$HIDE_TOP_BAR"
   printf 'STOP_XCAPE: "%s"\n' "$STOP_XCAPE"
   printf 'PROC_NAME:'
