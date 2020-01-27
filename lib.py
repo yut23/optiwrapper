@@ -7,6 +7,7 @@ Testing interaction with the C watch_focus program from inside python.
 
 import logging
 import os
+import re
 import sys
 from ctypes import (
     CDLL,
@@ -23,8 +24,8 @@ from ctypes import (
 )
 from typing import Callable, Iterable, List, Optional
 
-from proc.core import Process, find_processes  # type: ignore
-from Xlib import X, display, error  # type: ignore
+from proc.core import Process, find_processes
+from Xlib import X, display, error
 
 logger = logging.getLogger("optiwrapper")  # pylint: disable=invalid-name
 
@@ -373,7 +374,6 @@ def pgrep(pattern: str, match_full: bool = False) -> List[Process]:
                        ``/proc/<pid>/comm`` (which is limited to 15 characters)
     :return: a list of matching processes
     """
-    import re
 
     regex = re.compile(pattern)
     own_pid = str(os.getpid())

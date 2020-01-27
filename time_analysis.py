@@ -6,6 +6,7 @@ Analyzes playtime logs.
 
 import datetime
 import functools
+import operator
 import sys
 from enum import Enum
 from typing import List, NamedTuple, Optional
@@ -95,7 +96,7 @@ def process(events: List[Event], print_invalid: bool = True) -> List[Segment]:
     for line_num, next_evt in enumerate(events[1:], 2):
         if next_evt.event is None:
             continue
-        elif curr_evt.event is None:
+        if curr_evt.event is None:
             curr_evt = next_evt
             continue
         action = EVENT_PAIRS[(curr_evt.event, next_evt.event)]
@@ -149,8 +150,8 @@ if __name__ == "__main__":
     running_segs = process([e for e in evts if e.event in (START, STOP)], verbose)
     all_segs = process(evts, verbose)
 
-    run_time = functools.reduce(lambda x, y: x + y, (s.duration for s in running_segs))
-    active_time = functools.reduce(lambda x, y: x + y, (s.duration for s in all_segs))
+    run_time = functools.reduce(operator.add, (s.duration for s in running_segs))
+    active_time = functools.reduce(operator.add, (s.duration for s in all_segs))
     print("Total run time:    {}".format(run_time))
     if any(e.event in (LEAVE, RETURN) for e in evts):
         print("Total active time: {}".format(active_time))
