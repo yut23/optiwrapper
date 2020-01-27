@@ -87,7 +87,7 @@ FALLBACK [y]: Whether to run the game even if the discrete GPU is unavailable
 
 PRIMUS [y]: Whether to run with primus (optirun -b primus)
 
-VSYNC [n]: Whether to run primus with vblank_mode=0
+VSYNC [y]: Whether to run primus with vblank_mode=0
 
 HIDE_TOP_BAR [n]: Whether to hide the top bar when the game is run.
 
@@ -112,7 +112,7 @@ CONFIG_OPTIONS = {
     "USE_GPU": ("use_gpu", bool, True),
     "FALLBACK": ("fallback", bool, True),
     "PRIMUS": ("use_primus", bool, True),
-    "VSYNC": ("force_vsync", bool, False),
+    "VSYNC": ("force_vsync", bool, True),
     "HIDE_TOP_BAR": ("hide_top_bar", bool, False),
     "IS_32_BIT": ("is_32_bit", bool, False),
     "STOP_XCAPE": ("stop_xcape", bool, False),
