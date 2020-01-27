@@ -18,7 +18,18 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, Union, cast
+from typing import (
+    Any,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Set,
+    Tuple,
+    TypedDict,
+    Union,
+    cast,
+)
 
 import arrow
 import notify2
@@ -27,11 +38,51 @@ import hooks
 import lib
 from lib import myxdo, pgrep, search_windows, watch_focus
 
-ConfigDict = Dict[str, Union[None, str, List[str], bool, Path]]
 
+class ConfigDict(TypedDict, total=False):
+    cmd: Path
+    args: List[str]
+    game: str
+    logfile: Path
+    use_gpu: bool
+    fallback: bool
+    use_primus: bool
+    force_vsync: bool
+    is_32_bit: bool
+    proc_name: str
+    window_title: str
+    window_class: str
+    hooks: List[str]
+
+
+ConfigKeys = Literal[
+    "cmd",
+    "args",
+    "game",
+    "logfile",
+    "use_gpu",
+    "fallback",
+    "use_primus",
+    "force_vsync",
+    "is_32_bit",
+    "proc_name",
+    "window_title",
+    "window_class",
+    "hooks",
+]
+
+
+CONFIG_DEFAULTS = ConfigDict(
+    use_gpu=True, fallback=True, use_primus=True, force_vsync=True, is_32_bit=False
+)
+
+
+CONFIG_TYPES = cast(
+    Dict[ConfigKeys, type], ConfigDict.__annotations__  # pylint: disable=no-member
+)
 
 # constants
-WINDOW_WAIT_TIME = 20
+WINDOW_WAIT_TIME = 40
 PROCESS_WAIT_TIME = 20
 
 
@@ -107,27 +158,6 @@ HOOKS: Names of files to load from ~/Games/wrapper/hooks/. Common hooks:
 """
 
 
-CONFIG_OPTIONS = {
-    "CMD": ("cmd", Path, None),
-    "ARGS": ("args", list, None),
-    "GAME": ("game", str, None),
-    "LOGFILE": ("logfile", Path, None),
-    "USE_GPU": ("use_gpu", bool, True),
-    "FALLBACK": ("fallback", bool, True),
-    "USE_PRIMUS": ("use_primus", bool, True),
-    "FORCE_VSYNC": ("force_vsync", bool, True),
-    "IS_32_BIT": ("is_32_bit", bool, False),
-    "PROC_NAME": ("proc_name", str, None),
-    "WINDOW_TITLE": ("window_title", str, None),
-    "WINDOW_CLASS": ("window_class", str, None),
-    "HOOKS": ("hooks", list, None),
-}
-
-CONFIG_DEFAULTS: Dict[str, Any] = {
-    dest: default for dest, type_, default in CONFIG_OPTIONS.values()
-}
-
-
 class Event(enum.Enum):
     # pylint: disable=missing-docstring
     START = enum.auto()
@@ -137,7 +167,7 @@ class Event(enum.Enum):
     DIE = enum.auto()
 
 
-def format_config(options: Mapping[str, Any]) -> str:
+def format_config(options: ConfigDict) -> str:
     """
     Pretty-formats a set of config options.
     """
@@ -148,7 +178,7 @@ def format_config(options: Mapping[str, Any]) -> str:
     return "\n".join(out)
 
 
-def dump_test_config(options: Mapping[str, Any]) -> str:
+def dump_test_config(options: ConfigDict) -> str:
     """
     Dumps a set of config files for comparing against the bash script.
     """
@@ -162,29 +192,32 @@ def dump_test_config(options: Mapping[str, Any]) -> str:
     for outfile in sorted(LOGFILES):
         out.append(' "{:s}"'.format(outfile))
 
-    def dump_str(name: str) -> None:
-        val = options[CONFIG_OPTIONS[name][0]]
-        if val is not None:
-            out.append('{:s}: "{:s}"'.format(name, val))
-        else:
-            out.append("{:s}:".format(name))
-
-    def dump_bool(name: str) -> None:
-        out.append(
-            '{:s}: "{:s}"'.format(
-                name, "y" if options[CONFIG_OPTIONS[name][0]] else "n"
+    def dump(name: ConfigKeys) -> None:
+        option = name.upper()
+        type_ = CONFIG_TYPES[name]
+        val = options.get(name, None)
+        if val is None:
+            out.append("{:s}:".format(option))
+        elif type_ is str or type_ is Path:
+            out.append('{:s}: "{:s}"'.format(option, val))
+        elif type_ is bool:
+            out.append('{:s}: "{:s}"'.format(option, "y" if val else "n"))
+        elif type_ is List[str]:
+            out.append(
+                "{:s}: {:s}".format(
+                    option, " ".join(map('"{:s}"'.format, cast(List[str], val)))
+                )
             )
-        )
 
-    dump_str("GAME")
-    dump_bool("USE_GPU")
-    dump_bool("FALLBACK")
-    dump_bool("USE_PRIMUS")
-    dump_bool("FORCE_VSYNC")
-    dump_str("PROC_NAME")
-    dump_str("WINDOW_TITLE")
-    dump_str("WINDOW_CLASS")
-    out.append("HOOKS: " + " ".join('"{:s}"'.format(hook) for hook in options["hooks"]))
+    dump("game")
+    dump("use_gpu")
+    dump("fallback")
+    dump("use_primus")
+    dump("force_vsync")
+    dump("proc_name")
+    dump("window_title")
+    dump("window_class")
+    dump("hooks")
 
     return "\n".join(out)
 
@@ -200,10 +233,11 @@ def parse_config_file(data: str) -> ConfigDict:
     Parses the contents of a configuration file.
     """
 
-    def parse_option(option: str, value: Any) -> Tuple[str, Any]:
-        if option not in CONFIG_OPTIONS:
+    def parse_option(option: str, value: Any) -> Tuple[ConfigKeys, Any]:
+        if option.lower() not in CONFIG_TYPES:
             raise ConfigException("Invalid option: {}".format(option))
-        dest, type_ = CONFIG_OPTIONS[option][:2]
+        dest = cast(ConfigKeys, option.lower())
+        type_ = CONFIG_TYPES[dest]
 
         if type_ is str:
             vals = shlex.split(value)
@@ -211,7 +245,7 @@ def parse_config_file(data: str) -> ConfigDict:
                 # strip quotes if there's only one string
                 return dest, vals[0]
             return dest, value
-        if type_ is list:
+        if type_ is List[str]:
             if not (value and value[0] == "(" and value[-1] == ")"):
                 raise ConfigException(
                     "{} must be an array, surrounded by parens".format(option)
@@ -228,8 +262,7 @@ def parse_config_file(data: str) -> ConfigDict:
     config_p = configparser.ConfigParser()
     config_p.optionxform = str  # type: ignore
     config_p.read_string("[section]\n" + data)
-    options = CONFIG_DEFAULTS.copy()
-    options["args"] = []
+    options = ConfigDict()
     for opt, val in config_p.items("section"):
         dest, value = parse_option(opt, val)
         options[dest] = value
@@ -248,11 +281,11 @@ def check_config(cfg: ConfigDict) -> Optional[str]:
         return "No command specified"
 
     # the command must be a valid executable
-    if not cast(Path, cfg["cmd"]).is_file():
+    if not cfg["cmd"].is_file():
         return 'The file "{:s}" specified for command does not exist.'.format(
             str(cfg["cmd"])
         )
-    if not os.access(cast(Path, cfg["cmd"]), os.X_OK):
+    if not os.access(cfg["cmd"], os.X_OK):
         return 'The file "{:s}" specified for command is not executable.'.format(
             str(cfg["cmd"])
         )
@@ -305,10 +338,10 @@ def get_config(args: argparse.Namespace) -> ConfigDict:
     if args.configfile is not None:
         config.update(parse_config_file(args.configfile.read()))
 
-    if config["game"] is not None and config["logfile"] is None:
+    if "game" in config and "logfile" not in config:
         config["logfile"] = WRAPPER_DIR / "logs" / (config["game"] + ".log")
 
-    if config["logfile"] is not None:
+    if "logfile" in config:
         setup_logfile(config["logfile"])
 
     # check arguments
@@ -316,17 +349,18 @@ def get_config(args: argparse.Namespace) -> ConfigDict:
         # print('cli command:', args.command)
         if len(args.command) >= 1:
             config["cmd"] = Path(args.command[0]).absolute()
+        if len(args.command) >= 2:
             config["args"] = args.command[1:]
 
-    # override boolean options given on command line
-    for props in CONFIG_OPTIONS.values():
-        opt_name = props[0]
-        if (
-            props[1] == bool
-            and opt_name in args
-            and getattr(args, opt_name) is not None
-        ):
-            config[opt_name] = getattr(args, opt_name)
+    if args.use_gpu is not None:
+        config["use_gpu"] = args.use_gpu
+
+    if args.hide_top_bar is not None:
+        if "hooks" in config:
+            if "hide_top_bar" not in config["hooks"]:
+                config["hooks"].append("hide_top_bar")
+        else:
+            config["hooks"] = ["hide_top_bar"]
 
     return config
 
@@ -350,8 +384,8 @@ def construct_command_line(options: ConfigDict) -> Tuple[List[str], Dict[str, st
         if options["use_primus"]:
             cmd_args.extend("-b primus".split())
     cmd_args.append(str(options["cmd"]))
-    if options["args"] is not None:
-        cmd_args.extend(cast(List[str], options["args"]))
+    if "args" in options:
+        cmd_args.extend(options["args"])
     return cmd_args, environ
 
 
@@ -436,10 +470,10 @@ class FocusThread(threading.Thread):
         super().__init__()
         self.daemon = True
         self.kwargs: Dict[str, Union[bool, int, str]] = {"only_visible": True}
-        if cfg["window_title"] is not None:
-            self.kwargs["winname"] = cast(str, cfg["window_title"])
-        if cfg["window_class"] is not None:
-            self.kwargs["winclassname"] = "^" + cast(str, cfg["window_class"]) + "$"
+        if "window_title" in cfg:
+            self.kwargs["winname"] = cfg["window_title"]
+        if "window_class" in cfg:
+            self.kwargs["winclassname"] = "^" + cfg["window_class"] + "$"
 
     def run(self) -> None:
         # if a window is closed, search for new matching windows again
@@ -589,7 +623,7 @@ if __name__ == "__main__":
     logger.debug("\n%s", format_config(config))
 
     # setup time logging
-    if config["game"] is not None:
+    if "game" in config:
         TIME_LOGFILE = WRAPPER_DIR / "time/{}.log".format(config["game"])
         # create directory if it doesn't exist
         TIME_LOGFILE.parent.mkdir(parents=True, exist_ok=True)
@@ -631,18 +665,18 @@ if __name__ == "__main__":
 
     # run command
     proc = subprocess.Popen(command, env={**os.environ, **env_override})
-    if config["window_class"] is not None or config["window_title"] is not None:
+    if "window_class" in config or "window_title" in config:
         ft = FocusThread(config)
         ft.start()
 
-    if config["proc_name"] is None:
+    if "proc_name" not in config:
         # just wait for subprocess to finish
         proc.wait()
         logger.debug("subprocess %d done, exiting wrapper", proc.pid)
     else:
         # find process
         time.sleep(2)
-        pattern = cast(str, config["proc_name"])
+        pattern = config["proc_name"]
         proc_start_time = time.time()
         procs = pgrep(pattern)
         logger.debug("found: %s", procs)
