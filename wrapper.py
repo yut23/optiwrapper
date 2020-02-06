@@ -180,24 +180,24 @@ class Event(enum.Enum):
     DIE = enum.auto()
 
 
-def format_config(options: ConfigDict) -> str:
+def format_config(config: ConfigDict) -> str:
     """
     Pretty-formats a set of config options.
     """
     out = []
-    option_width = max(len(o) for o in options.keys()) + 1
-    for option, value in options.items():
+    option_width = max(len(o) for o in config.keys()) + 1
+    for option, value in config.items():
         out.append("{:<{width}s} {}".format(option + ":", value, width=option_width))
     return "\n".join(out)
 
 
-def dump_test_config(options: ConfigDict) -> str:
+def dump_test_config(config: ConfigDict) -> str:
     """
     Dumps a set of config files for comparing against the bash script.
     """
     out = []
-    temp = 'COMMAND: "{:s}"'.format(str(options["cmd"]))
-    for arg in options["args"]:
+    temp = 'COMMAND: "{:s}"'.format(str(config["cmd"]))
+    for arg in config["args"]:
         temp += ' "{:s}"'.format(arg)
     out.append(temp)
 
@@ -208,7 +208,7 @@ def dump_test_config(options: ConfigDict) -> str:
     def dump(name: ConfigKeys) -> None:
         option = name.upper()
         type_ = CONFIG_TYPES[name]
-        val = options.get(name, None)
+        val = config.get(name, None)
         if val is None:
             out.append("{:s}:".format(option))
         elif type_ is str or type_ is Path:
@@ -275,32 +275,32 @@ def parse_config_file(data: str) -> ConfigDict:
     config_p = configparser.ConfigParser()
     config_p.optionxform = str  # type: ignore
     config_p.read_string("[section]\n" + data)
-    options = ConfigDict()
+    config = ConfigDict()
     for opt, val in config_p.items("section"):
         dest, value = parse_option(opt, val)
-        options[dest] = value
+        config[dest] = value
 
-    return options
+    return config
 
 
-def check_config(cfg: ConfigDict) -> Optional[str]:
+def check_config(config: ConfigDict) -> Optional[str]:
     """
     Checks if a configuration is valid.
 
     Returns None if it is valid, or an error message if not.
     """
     # a command is required
-    if not cfg["cmd"]:
+    if not config["cmd"]:
         return "No command specified"
 
     # the command must be a valid executable
-    if not cfg["cmd"].is_file():
+    if not config["cmd"].is_file():
         return 'The file "{:s}" specified for command does not exist.'.format(
-            str(cfg["cmd"])
+            str(config["cmd"])
         )
-    if not os.access(cfg["cmd"], os.X_OK):
+    if not os.access(config["cmd"], os.X_OK):
         return 'The file "{:s}" specified for command is not executable.'.format(
-            str(cfg["cmd"])
+            str(config["cmd"])
         )
 
     return None
@@ -319,11 +319,12 @@ def setup_logfile(logfile: Any) -> None:
         LOGFILES.add(str(logpath))
 
 
-def get_config(args: argparse.Namespace) -> ConfigDict:
+def get_config(
+    args: argparse.Namespace,  # pylint: disable=redefined-outer-name
+) -> ConfigDict:
     """
     Constructs a configuration from the given arguments.
     """
-    # pylint: disable=redefined-outer-name
     config = CONFIG_DEFAULTS.copy()
 
     # order of configuration precedence, from highest to lowest:
@@ -378,7 +379,7 @@ def get_config(args: argparse.Namespace) -> ConfigDict:
     return config
 
 
-def construct_command_line(options: ConfigDict) -> Tuple[List[str], Dict[str, str]]:
+def construct_command_line(config: ConfigDict) -> Tuple[List[str], Dict[str, str]]:
     """
     Constructs a full command line and environment dict from a configuration
     """
@@ -386,19 +387,19 @@ def construct_command_line(options: ConfigDict) -> Tuple[List[str], Dict[str, st
     environ: Dict[str, str] = dict()
     # check if we're running under nvidia-xrun
     if os.environ.get("NVIDIA_XRUN") is not None:
-        if not options["force_vsync"]:
+        if not config["force_vsync"]:
             environ["__GL_SYNC_TO_VBLANK"] = "0"
-    elif options["use_gpu"]:
-        if options["use_primus"] and not options["force_vsync"]:
+    elif config["use_gpu"]:
+        if config["use_primus"] and not config["force_vsync"]:
             environ["vblank_mode"] = "0"
         cmd_args.append("optirun")
         if logger.level == logging.DEBUG:
             cmd_args.append("--debug")
-        if options["use_primus"]:
+        if config["use_primus"]:
             cmd_args.extend("-b primus".split())
-    cmd_args.append(str(options["cmd"]))
-    if "args" in options:
-        cmd_args.extend(options["args"])
+    cmd_args.append(str(config["cmd"]))
+    if "args" in config:
+        cmd_args.extend(config["args"])
     return cmd_args, environ
 
 
@@ -479,14 +480,14 @@ def unfocus() -> None:
 
 
 class FocusThread(threading.Thread):
-    def __init__(self, cfg: ConfigDict):
+    def __init__(self, config: ConfigDict):
         super().__init__()
         self.daemon = True
         self.kwargs: Dict[str, Union[bool, int, str]] = {"only_visible": True}
-        if "window_title" in cfg:
-            self.kwargs["winname"] = cfg["window_title"]
-        if "window_class" in cfg:
-            self.kwargs["winclassname"] = "^" + cfg["window_class"] + "$"
+        if "window_title" in config:
+            self.kwargs["winname"] = config["window_title"]
+        if "window_class" in config:
+            self.kwargs["winclassname"] = "^" + config["window_class"] + "$"
 
     def run(self) -> None:
         # if a window is closed, search for new matching windows again
@@ -600,15 +601,15 @@ if __name__ == "__main__":
     if args.outfile is not None:
         setup_logfile(args.outfile)
 
-    config = get_config(args)
+    cfg = get_config(args)
 
-    cfg_err_msg = check_config(config)
+    cfg_err_msg = check_config(cfg)
     if cfg_err_msg is not None:
         logger.error(cfg_err_msg)
         sys.exit(1)
 
     # check if discrete GPU works, notify if not
-    if config["use_gpu"] and os.environ.get("NVIDIA_XRUN") is None:
+    if cfg["use_gpu"] and os.environ.get("NVIDIA_XRUN") is None:
         try:
             optirun_works = (
                 subprocess.run(["optirun", "--silent", "true"], check=True).returncode
@@ -618,41 +619,41 @@ if __name__ == "__main__":
             optirun_works = False
 
         if not optirun_works:
-            if config["fallback"]:
+            if cfg["fallback"]:
                 notify(
                     "Discrete GPU not working, falling back to integrated GPU",
                     logging.ERROR,
                     True,
                 )
-                config["use_gpu"] = False
+                cfg["use_gpu"] = False
             else:
                 notify("Discrete GPU not working, quitting", logging.ERROR, True)
                 sys.exit(1)
 
     if args.test:
-        print(dump_test_config(config))
+        print(dump_test_config(cfg))
         sys.exit(0)
 
-    logger.debug("\n%s", format_config(config))
+    logger.debug("\n%s", format_config(cfg))
 
     # setup time logging
-    if "game" in config:
-        TIME_LOGFILE = WRAPPER_DIR / "time/{}.log".format(config["game"])
+    if "game" in cfg:
+        TIME_LOGFILE = WRAPPER_DIR / "time/{}.log".format(cfg["game"])
         # create directory if it doesn't exist
         TIME_LOGFILE.parent.mkdir(parents=True, exist_ok=True)
 
     # setup command
-    command, env_override = construct_command_line(config)
+    command, env_override = construct_command_line(cfg)
     logger.debug("Command: %s", repr(command))
 
     # load hooks
     hooks.register_hooks()
-    for hook_name in config["hooks"]:
+    for hook_name in cfg.get("hooks", []):
         hooks.load_hook(hook_name)
 
     # remove overlay library for wrong architecture
     if "LD_PRELOAD" in os.environ:
-        if config["is_32_bit"]:
+        if cfg["is_32_bit"]:
             bad_lib = "ubuntu12_64"
         else:
             bad_lib = "ubuntu12_32"
@@ -678,18 +679,18 @@ if __name__ == "__main__":
 
     # run command
     proc = subprocess.Popen(command, env={**os.environ, **env_override})
-    if "window_class" in config or "window_title" in config:
-        ft = FocusThread(config)
+    if "window_class" in cfg or "window_title" in cfg:
+        ft = FocusThread(cfg)
         ft.start()
 
-    if "proc_name" not in config:
+    if "proc_name" not in cfg:
         # just wait for subprocess to finish
         proc.wait()
         logger.debug("subprocess %d done, exiting wrapper", proc.pid)
     else:
         # find process
         time.sleep(2)
-        pattern = config["proc_name"]
+        pattern = cfg["proc_name"]
         proc_start_time = time.time()
         procs = pgrep(pattern)
         logger.debug("found: %s", procs)
