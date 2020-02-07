@@ -420,7 +420,7 @@ def start() -> None:
     """
     logger.debug("game starting...")
     log_time(Event.START)
-    for hook in hooks.get_hooks():
+    for hook in hooks.get_hooks().values():
         hook.on_start()
 
 
@@ -434,7 +434,7 @@ def stop(killed: bool = False) -> None:
         log_time(Event.DIE)
     else:
         log_time(Event.STOP)
-    for hook in hooks.get_hooks():
+    for hook in hooks.get_hooks().values():
         hook.on_stop()
 
 
@@ -445,7 +445,7 @@ def focus() -> None:
     logger.debug("window focused")
     if lib.running:
         log_time(Event.FOCUS)
-    for hook in hooks.get_hooks():
+    for hook in hooks.get_hooks().values():
         hook.on_focus()
 
 
@@ -456,7 +456,7 @@ def unfocus() -> None:
     logger.debug("window unfocused")
     if lib.running:
         log_time(Event.UNFOCUS)
-    for hook in hooks.get_hooks():
+    for hook in hooks.get_hooks().values():
         hook.on_unfocus()
 
 

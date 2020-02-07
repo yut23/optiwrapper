@@ -2,7 +2,7 @@ import glob
 import importlib
 import logging
 from os.path import dirname, join, realpath, split, splitext
-from typing import Dict, List, Type
+from typing import Any, Dict, Type
 
 logger = logging.getLogger("optiwrapper." + __name__)
 
@@ -24,17 +24,17 @@ class WrapperHook:
 
 
 _REGISTERED_HOOKS: Dict[str, Type[WrapperHook]] = dict()
-_LOADED_HOOKS: List[WrapperHook] = list()
+_LOADED_HOOKS: Dict[str, WrapperHook] = dict()
 
 
 def load_hook(name: str) -> None:
     if name not in _REGISTERED_HOOKS:
         raise ValueError(f"Hook not found: {name!r}")
-    _LOADED_HOOKS.append(_REGISTERED_HOOKS[name]())
+    _LOADED_HOOKS[name] = _REGISTERED_HOOKS[name]()
     logger.debug("loaded hook %r", name)
 
 
-def get_hooks() -> List[WrapperHook]:
+def get_hooks() -> Dict[str, WrapperHook]:
     return _LOADED_HOOKS
 
 
