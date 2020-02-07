@@ -40,10 +40,8 @@ from lib import myxdo, pgrep, search_windows, watch_focus
 
 
 class ConfigDict(TypedDict, total=False):
-    cmd: Path
-    args: List[str]
+    cmd: List[str]
     game: str
-    logfile: Path
     use_gpu: bool
     fallback: bool
     use_primus: bool
@@ -57,9 +55,7 @@ class ConfigDict(TypedDict, total=False):
 
 ConfigKeys = Literal[
     "cmd",
-    "args",
     "game",
-    "logfile",
     "use_gpu",
     "fallback",
     "use_primus",
@@ -134,15 +130,10 @@ Configuration file:
 The following are loaded as variables from ~/Games/wrapper/config/<game>.cfg.
 Boolean values are either "y" or "n".
 
-CMD: The executable to run. If relative, the path will be resolved from the
-  current working directory.
-
-ARGS: Any extra arguments to pass to the executable, as an array.
+CMD: The command to run, as an array of arguments. If specified, any arguments
+  passed on the command line will be ignored.
 
 GAME: The game's name (only needed if the config file is specified using a path)
-
-LOGFILE: Path to a log file. If set but empty, no log file will be created.
-  If unset, will default to "~/Games/wrapper/logs/<GAME>.log".
 
 USE_GPU [y]: Whether to run on the discrete GPU
 
@@ -196,10 +187,7 @@ def dump_test_config(config: ConfigDict) -> str:
     Dumps a set of config files for comparing against the bash script.
     """
     out = []
-    temp = 'COMMAND: "{:s}"'.format(str(config["cmd"]))
-    for arg in config["args"]:
-        temp += ' "{:s}"'.format(arg)
-    out.append(temp)
+    out.append("COMMAND: " + " ".join(map("{:s}".format, config["cmd"])))
 
     out.append("OUTPUT_FILES:")
     for outfile in sorted(LOGFILES):
@@ -294,13 +282,13 @@ def check_config(config: ConfigDict) -> Optional[str]:
         return "No command specified"
 
     # the command must be a valid executable
-    if not config["cmd"].is_file():
+    if not os.path.isfile(config["cmd"][0]):
         return 'The file "{:s}" specified for command does not exist.'.format(
-            str(config["cmd"])
+            config["cmd"][0]
         )
-    if not os.access(config["cmd"], os.X_OK):
+    if not os.access(config["cmd"][0], os.X_OK):
         return 'The file "{:s}" specified for command is not executable.'.format(
-            str(config["cmd"])
+            config["cmd"][0]
         )
 
     return None
@@ -329,42 +317,36 @@ def get_config(
 
     # order of configuration precedence, from highest to lowest:
     #  1. command line parameters (<command>, --hide-top-bar, --no-discrete)
-    #  2. explicit configuration file (--configfile)
-    #  3. game configuration file (--game)
+    #  2. game configuration file (--game)
 
     # parse game config file
-    if args.game is not None:
-        try:
-            with open(WRAPPER_DIR / "config" / (args.game + ".cfg")) as file:
-                config_data = file.read()
-            config.update(parse_config_file(config_data))
-        except OSError:
-            if args.configfile is None:
-                logger.error(
-                    'The configuration file for "%s" was not found in %s.',
-                    args.game,
-                    WRAPPER_DIR / "config",
-                )
-                sys.exit(1)
-        config["game"] = args.game
+    config["game"] = args.game
+    assert config["game"] is not None
+    try:
+        with open(WRAPPER_DIR / "config" / (config["game"] + ".cfg")) as file:
+            config_data = file.read()
+        config.update(parse_config_file(config_data))
+    except OSError:
+        logger.error(
+            'The configuration file for "%s" was not found in %s.',
+            config["game"],
+            WRAPPER_DIR / "config",
+        )
+        sys.exit(1)
 
-    # check for explicit config file
-    if args.configfile is not None:
-        config.update(parse_config_file(args.configfile.read()))
-
-    if "game" in config and "logfile" not in config:
-        config["logfile"] = WRAPPER_DIR / "logs" / (config["game"] + ".log")
-
-    if "logfile" in config:
-        setup_logfile(config["logfile"])
+    setup_logfile(WRAPPER_DIR / "logs" / (config["game"] + ".log"))
 
     # check arguments
     if args.command is not None:
         # print('cli command:', args.command)
-        if len(args.command) >= 1:
-            config["cmd"] = Path(args.command[0]).absolute()
-        if len(args.command) >= 2:
-            config["args"] = args.command[1:]
+        if "cmd" not in config or not config["cmd"]:
+            config["cmd"] = args.command
+        elif "cmd" in config and config["cmd"]:
+            if config["cmd"][0] != args.command[0]:
+                logger.warning(
+                    "Different command given in config file and command line"
+                )
+            config["cmd"] = args.command
 
     if args.use_gpu is not None:
         config["use_gpu"] = args.use_gpu
@@ -397,9 +379,8 @@ def construct_command_line(config: ConfigDict) -> Tuple[List[str], Dict[str, str
             cmd_args.append("--debug")
         if config["use_primus"]:
             cmd_args.extend("-b primus".split())
-    cmd_args.append(str(config["cmd"]))
-    if "args" in config:
-        cmd_args.extend(config["args"])
+    if "cmd" in config:
+        cmd_args.extend(config["cmd"])
     return cmd_args, environ
 
 
@@ -545,16 +526,10 @@ if __name__ == "__main__":
         nargs=argparse.REMAINDER,
     )
     parser.add_argument(
-        "-C",
-        "--configfile",
-        type=argparse.FileType("r"),
-        metavar="FILE",
-        help="use a specific configuration file",
-    )
-    parser.add_argument(
         "-G",
         "--game",
         metavar="GAME",
+        required=True,
         help=("specify a game (will search for a config file)"),
     )
     parser.add_argument(
