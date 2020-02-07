@@ -627,14 +627,8 @@ if __name__ == "__main__":
         hooks.load_hook(hook_name)
 
     # remove overlay library for wrong architecture
-    if "LD_PRELOAD" in os.environ:
-        if cfg["is_32_bit"]:
-            bad_lib = "ubuntu12_64"
-        else:
-            bad_lib = "ubuntu12_32"
-        env_override["LD_PRELOAD"] = ":".join(
-            lib_ for lib_ in os.environ["LD_PRELOAD"].split(":") if bad_lib not in lib_
-        )
+    env_override.update(lib.remove_overlay(cfg["is_32_bit"]))
+    if "LD_PRELOAD" in env_override:
         logger.debug('Fixed LD_PRELOAD: now "%s"', env_override["LD_PRELOAD"])
 
     def cb_signal_handler(signum, frame):

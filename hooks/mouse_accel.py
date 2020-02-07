@@ -1,11 +1,19 @@
-import subprocess
+from . import WrapperHook, check_output, run
 
-from . import WrapperHook
+TOOL = "mouse-accel"
 
 
 class Hook(WrapperHook):
+    def __init__(self) -> None:
+        self.original_states = dict()
+        output = check_output([TOOL, "get"], text=True)
+        for line in output.strip().split("\n"):
+            device, state = line.strip().split(": acceleration ")
+            self.original_states[device] = state
+
     def on_focus(self) -> None:
-        subprocess.run(["/home/eric/bin/mouse-accel", "off"], check=False)
+        run([TOOL, "off"], check=False)
 
     def on_unfocus(self) -> None:
-        subprocess.run(["/home/eric/bin/mouse-accel", "on"], check=False)
+        for device, state in self.original_states.items():
+            run([TOOL, state, device], check=False)

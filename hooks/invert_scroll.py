@@ -1,6 +1,6 @@
 import subprocess
 
-from . import WrapperHook, logger
+from . import WrapperHook, logger, run
 
 
 class Hook(WrapperHook):
@@ -9,7 +9,7 @@ class Hook(WrapperHook):
 
     def on_focus(self) -> None:
         try:
-            subprocess.run(
+            run(
                 [
                     "xinput",
                     "set-button-map",
@@ -23,7 +23,7 @@ class Hook(WrapperHook):
 
     def on_unfocus(self) -> None:
         try:
-            subprocess.run(
+            run(
                 [
                     "xinput",
                     "set-button-map",

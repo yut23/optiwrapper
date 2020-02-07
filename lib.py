@@ -22,7 +22,7 @@ from ctypes import (
     c_void_p,
     pointer,
 )
-from typing import Callable, Iterable, List, Optional
+from typing import Callable, Dict, Iterable, List, Optional
 
 from proc.core import Process, find_processes
 from Xlib import X, display, error
@@ -396,6 +396,22 @@ def pgrep(pattern: str, match_full: bool = False) -> List[Process]:
                 procs.append(proc)
 
     return procs
+
+
+def remove_overlay(is_32_bit: bool = False) -> Dict[str, str]:
+    if is_32_bit:
+        bad_lib = "ubuntu12_64"
+    else:
+        bad_lib = "ubuntu12_32"
+    if bad_lib in os.environ.get("LD_PRELOAD", ""):
+        return {
+            "LD_PRELOAD": ":".join(
+                lib_
+                for lib_ in os.environ["LD_PRELOAD"].split(":")
+                if bad_lib not in lib_
+            ),
+        }
+    return dict()
 
 
 if __name__ == "__main__":

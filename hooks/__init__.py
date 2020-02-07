@@ -1,10 +1,39 @@
 import glob
 import importlib
 import logging
+import os
+import subprocess
 from os.path import dirname, join, realpath, split, splitext
 from typing import Any, Dict, Type
 
+from lib import remove_overlay
+
 logger = logging.getLogger("optiwrapper." + __name__)
+
+
+def run(
+    *args: Any, is_32_bit: bool = False, **kwargs: Any
+) -> "subprocess.CompletedProcess[Any]":
+    kwargs = kwargs.copy()
+    env_override = remove_overlay(is_32_bit)
+    if "env" in kwargs:
+        kwargs["env"].update(env_override)
+    else:
+        kwargs["env"] = {**os.environ, **env_override}
+    if "check" not in kwargs:
+        kwargs["check"] = True
+    return subprocess.run(*args, **kwargs)  # pylint: disable=subprocess-run-check
+
+
+def check_output(*args: Any, is_32_bit: bool = False, **kwargs: Any) -> str:
+    kwargs = kwargs.copy()
+    env_override = remove_overlay(is_32_bit)
+    if "env" in kwargs:
+        kwargs["env"].update(env_override)
+    else:
+        kwargs["env"] = {**os.environ, **env_override}
+    kwargs["text"] = True
+    return subprocess.check_output(*args, **kwargs)  # type: ignore
 
 
 class WrapperHook:
