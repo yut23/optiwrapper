@@ -652,18 +652,25 @@ if __name__ == "__main__":
     start()
 
     # check if we're in a WM
-    wmctrl_proc = subprocess.run(
-        ["wmctrl", "-m"],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+    in_window_manager = (
+        subprocess.run(
+            ["wmctrl", "-m"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        == 0
     )
 
     # run command
     proc = subprocess.Popen(command, env={**os.environ, **env_override})
-    if ("window_class" in cfg or "window_title" in cfg) and wmctrl_proc.returncode == 0:
+    if ("window_class" in cfg or "window_title" in cfg) and in_window_manager:
         ft = FocusThread(cfg)
         ft.start()
+
+    if not in_window_manager:
+        # add focus event for better time tracking
+        focus()
 
     if "proc_name" not in cfg:
         # just wait for subprocess to finish
