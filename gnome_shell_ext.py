@@ -1,43 +1,44 @@
 """
-Cribbed from gnome-shell-extension-tool.
+Python implementation of gnome-extensions-tool.
+<https://gitlab.gnome.org/fmuellner/gnome-extensions-tool>
 """
 
-import os
-import subprocess
-from typing import Any, Dict
+from typing import cast
 
-from lib import logger, remove_overlay
+from gi.repository import GLib
+from pydbus import SessionBus
 
-
-def get_kwargs(subcommand: str, uuid: str) -> Dict[str, Any]:
-    kwargs = {
-        "args": ["/usr/bin/gnome-extensions", subcommand, uuid],
-        "text": True,
-    }
-    # remove 32-bit steam overlay from LD_PRELOAD
-    env_override = remove_overlay()
-    logger.debug(env_override)
-    if env_override:
-        kwargs["env"] = {**os.environ, **env_override}
-    return kwargs
+bus = SessionBus()
 
 
 def enable_extension(uuid: str) -> None:
     """
     Enables the extension with `uuid`.
     """
-    subprocess.run(check=True, **get_kwargs("enable", uuid))
+    try:
+        shell = bus.get("org.gnome.Shell")
+        shell.EnableExtension(uuid)
+    except GLib.GError:
+        pass
 
 
 def disable_extension(uuid: str) -> None:
     """
     Disables the extension with `uuid`.
     """
-    subprocess.run(check=True, **get_kwargs("disable", uuid))
+    try:
+        shell = bus.get("org.gnome.Shell")
+        shell.DisableExtension(uuid)
+    except GLib.GError:
+        pass
 
 
 def is_extension_enabled(uuid: str) -> bool:
     """
     Returns True if the extension with `uuid` is enabled.
     """
-    return "State: ENABLED" in subprocess.check_output(**get_kwargs("info", uuid))
+    try:
+        shell = bus.get("org.gnome.Shell")
+        return cast(bool, shell.GetExtensionInfo(uuid).get("state", -1) == 1)
+    except GLib.GError:
+        return False
