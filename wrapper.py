@@ -33,6 +33,7 @@ from typing import (
 
 import arrow
 import notify2
+from notify2 import dbus
 
 import hooks
 import lib
@@ -410,8 +411,9 @@ def notify(msg: str, level: int = logging.INFO, log: bool = False) -> None:
     }.get(level, "dialog-information")
     if log:
         logger.log(level, msg)
-    n = notify2.Notification("optiwrapper", msg, icon)
-    n.show()
+    if notify2 is not None:
+        n = notify2.Notification("optiwrapper", msg, icon)
+        n.show()
 
 
 def start() -> None:
@@ -507,7 +509,10 @@ if __name__ == "__main__":
     logger.addHandler(ch)
 
     # initialize notification system
-    notify2.init("optiwrapper")
+    try:
+        notify2.init("optiwrapper")
+    except dbus.exceptions.DBusException:
+        notify2 = None
 
     # command line arguments
     parser = argparse.ArgumentParser(
@@ -646,9 +651,17 @@ if __name__ == "__main__":
     atexit.register(stop)
     start()
 
+    # check if we're in a WM
+    wmctrl_proc = subprocess.run(
+        ["wmctrl", "-m"],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
     # run command
     proc = subprocess.Popen(command, env={**os.environ, **env_override})
-    if "window_class" in cfg or "window_title" in cfg:
+    if ("window_class" in cfg or "window_title" in cfg) and wmctrl_proc.returncode == 0:
         ft = FocusThread(cfg)
         ft.start()
 
