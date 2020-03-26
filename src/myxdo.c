@@ -10,6 +10,7 @@
 #include "myxdo.h"
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
+#include <X11/Xlibint.h>
 #include <X11/Xresource.h>
 #include <X11/Xutil.h>
 #include <X11/extensions/XTest.h>
@@ -74,6 +75,14 @@ void _xdo_eprintf(const xdo_t *xdo, int hushable, const char *format, ...) {
   fprintf(stderr, "\n");
   va_end(args);
 } /* _xdo_eprintf */
+
+static int error_handler(Display *dpy, XErrorEvent *ev) {
+  if (ev->error_code == BadWindow) {
+    /* window has disappeared, ignore it */
+    return 0;
+  }
+  return _XDefaultError(dpy, ev);
+}
 
 xdo_t *xdo_new(const char *display_name) {
   Display *xdpy;
@@ -215,6 +224,7 @@ int xdo_get_desktop_for_window(const xdo_t *xdo, Window wid, long *desktop) {
   long nitems = 0;
   unsigned char *data;
   Atom request;
+  XErrorHandler handler;
 
   if (_xdo_ewmh_is_supported(xdo, "_NET_WM_DESKTOP") == False) {
     fprintf(stderr, "Your windowmanager claims not to support _NET_WM_DESKTOP, "
@@ -225,8 +235,10 @@ int xdo_get_desktop_for_window(const xdo_t *xdo, Window wid, long *desktop) {
 
   request = XInternAtom(xdo->xdpy, "_NET_WM_DESKTOP", False);
 
+  handler = XSetErrorHandler(error_handler);
   data =
       xdo_get_window_property_by_atom(xdo, wid, request, &nitems, &type, &size);
+  XSetErrorHandler(handler);
 
   if (nitems > 0) {
     *desktop = *((long *)data);
@@ -242,10 +254,12 @@ int xdo_get_desktop_for_window(const xdo_t *xdo, Window wid, long *desktop) {
 int xdo_search_windows(const xdo_t *xdo, const xdo_search_t *search,
                        Window **windowlist_ret, unsigned int *nwindows_ret) {
 
+  XErrorHandler handler;
   unsigned int windowlist_size = 100;
   *nwindows_ret = 0;
   *windowlist_ret = calloc(sizeof(Window), windowlist_size);
 
+  handler = XSetErrorHandler(error_handler);
   /* TODO(sissel): Support multiple screens */
   if (search->searchmask & SEARCH_SCREEN) {
     Window root = RootWindow(xdo->xdpy, search->screen);
@@ -275,6 +289,7 @@ int xdo_search_windows(const xdo_t *xdo, const xdo_search_t *search,
                             &windowlist_size, 1);
     }
   }
+  XSetErrorHandler(handler);
 
   // printf("Window count: %d\n", (int)ncandidate_windows);
   // printf("Search:\n");
