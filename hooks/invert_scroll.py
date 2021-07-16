@@ -1,36 +1,23 @@
-import subprocess
+from Xlib import display
 
-from . import WrapperHook, logger, run
+from . import WrapperHook
 
 
 class Hook(WrapperHook):
+    def __init__(self) -> None:
+        self.display = display.Display()
+
     def on_start(self) -> None:
         pass
 
     def on_focus(self) -> None:
-        try:
-            run(
-                [
-                    "xinput",
-                    "set-button-map",
-                    "Logitech M510",
-                    *"1 2 3 5 4 6 7 8 9".split(),
-                ],
-                check=True,
-            )
-        except subprocess.CalledProcessError:
-            logger.exception(__name__)
+        old_map = self.display.get_pointer_mapping()
+        new_map = old_map.copy()
+        new_map[3:5] = [5, 4]
+        self.display.set_pointer_mapping(new_map)
 
     def on_unfocus(self) -> None:
-        try:
-            run(
-                [
-                    "xinput",
-                    "set-button-map",
-                    "Logitech M510",
-                    *"1 2 3 4 5 6 7 8 9".split(),
-                ],
-                check=True,
-            )
-        except subprocess.CalledProcessError:
-            logger.exception(__name__)
+        old_map = self.display.get_pointer_mapping()
+        new_map = old_map.copy()
+        new_map[3:5] = [4, 5]
+        self.display.set_pointer_mapping(new_map)
