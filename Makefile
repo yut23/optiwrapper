@@ -1,9 +1,11 @@
 CC=clang
 CFLAGS?=-Wall
-CFLAGS+=-g
-LDFLAGS=-lxdo -lX11
+CFLAGS+=-g# -fsanitize=address -fno-omit-frame-pointer
+LDFLAGS=-lX11
+CXX=clang++
+CXXFLAGS=$(CFLAGS)
 
-all: watch_focus myxdo
+all: watch_focus myxdo myxdo_test
 
 watch_focus: src/watch_focus.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
@@ -12,7 +14,10 @@ watch_focus: src/watch_focus.c
 myxdo: myxdo.so
 
 myxdo.so: src/myxdo.c
-	$(CC) -fPIC -shared -Wl,-soname,$(@:%.so=%) -lX11 -o $@ $^
+	$(CC) $(CFLAGS) -fPIC -shared -lX11 -o $@ $^
+
+myxdo_test: src/myxdo_test.cpp myxdo.so
+	$(CXX) $(CXXFLAGS) -L. -l:myxdo.so -Wl,-rpath '-Wl,$$ORIGIN' -o $@ $^
 
 clean:
-	rm -f watch_focus myxdo.so
+	rm -f watch_focus myxdo.so myxdo_test
