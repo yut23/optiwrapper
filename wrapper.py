@@ -376,7 +376,7 @@ def get_config(
     setup_logfile(WRAPPER_DIR / "logs" / (config["game"] + ".log"))
 
     # check arguments
-    if args.command is not None:
+    if args.command:
         # print('cli command:', args.command)
         if "cmd" not in config or not config["cmd"]:
             config["cmd"] = args.command
