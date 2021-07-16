@@ -5,7 +5,7 @@ from . import WrapperHook
 
 class Hook(WrapperHook):
     def __init__(self) -> None:
-        self.xcape_procs = pgrep("xcape")
+        self.xcape_procs = pgrep("xcape .*Control_L", match_full=True)
 
     def on_focus(self) -> None:
         for xcape_proc in self.xcape_procs:
