@@ -37,7 +37,8 @@ from notify2 import dbus
 
 import hooks
 import lib
-from lib import myxdo, pgrep, search_windows, watch_focus
+from lib import pgrep, watch_focus
+from libxdo import xdo_free, xdo_new, xdo_search_windows
 
 
 class ConfigDict(TypedDict, total=False):
@@ -503,7 +504,10 @@ class FocusThread(threading.Thread):
     def __init__(self, config: ConfigDict):
         super().__init__()
         self.daemon = True
-        self.kwargs: Dict[str, Union[bool, int, str]] = {"only_visible": True}
+        self.kwargs: Dict[str, Union[bool, int, str]] = {
+            "only_visible": True,
+            "require_all": True,  # require all conditions to match
+        }
         if "window_title" in config:
             self.kwargs["winname"] = config["window_title"]
         if "window_class" in config:
@@ -512,9 +516,10 @@ class FocusThread(threading.Thread):
     def run(self) -> None:
         # if a window is closed, search for new matching windows again
         closed_win = 1
+        logger.debug("waiting for window...")
         while closed_win > 0 and lib.running:
-            xdo = myxdo.xdo_new(None)
-            wins = search_windows(xdo, **self.kwargs)  # type: ignore
+            xdo = xdo_new(None)
+            wins = xdo_search_windows(xdo, **self.kwargs)  # type: ignore
             window_start_time = time.time()
             while not wins and lib.running:
                 if time.time() > window_start_time + WINDOW_WAIT_TIME:
@@ -524,15 +529,27 @@ class FocusThread(threading.Thread):
                         log=True,
                     )
                     sys.exit(1)
-                time.sleep(0.5)
-                wins = search_windows(xdo, **self.kwargs)  # type: ignore
-            myxdo.xdo_free(xdo)
+                time.sleep(0.1)
+                wins = xdo_search_windows(xdo, **self.kwargs)  # type: ignore
+            xdo_free(xdo)
             xdo = None
-            logger.debug("found window(s): [%s]", ", ".join(map("0x{:x}".format, wins)))
-            closed_win = watch_focus(
-                wins, lambda evt: focus(), lambda evt: unfocus()  # type: ignore
+            if not lib.running:
+                logger.debug("game stopped; focus thread exiting")
+                return
+            if len(wins) > 1:
+                logger.error(
+                    "found multiple windows (%s): can't track focus correctly",
+                    ", ".join(map("0x{:x}".format, wins)),
+                )
+                return
+            logger.debug("found window: 0x%x", wins[0])
+            closed_win = next(
+                watch_focus(wins, lambda evt: focus(), lambda evt: unfocus(),)
             )
+            logger.debug("watch_focus returned %x", closed_win)
             time.sleep(0.1)
+        if closed_win <= 0:
+            logger.debug("window closed")
 
 
 if __name__ == "__main__":

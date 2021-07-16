@@ -49,61 +49,55 @@ typedef struct xdo {
 } xdo_t;
 
 /**
- * Search only window title. DEPRECATED - Use SEARCH_NAME
- * @see xdo_search_windows
- */
-#define SEARCH_TITLE (1UL << 0)
-
-/**
  * Search only window class.
  * @see xdo_search_windows
  */
-#define SEARCH_CLASS (1UL << 1)
+#define SEARCH_CLASS (1UL << 0)
 
 /**
  * Search only window name.
  * @see xdo_search_windows
  */
-#define SEARCH_NAME (1UL << 2)
+#define SEARCH_NAME (1UL << 1)
 
 /**
  * Search only window pid.
  * @see xdo_search_windows
  */
-#define SEARCH_PID (1UL << 3)
+#define SEARCH_PID (1UL << 2)
 
 /**
  * Search only visible windows.
  * @see xdo_search_windows
  */
-#define SEARCH_ONLYVISIBLE (1UL << 4)
+#define SEARCH_ONLYVISIBLE (1UL << 3)
 
 /**
  * Search only a specific screen.
  * @see xdo_search.screen
  * @see xdo_search_windows
  */
-#define SEARCH_SCREEN (1UL << 5)
+#define SEARCH_SCREEN (1UL << 4)
 
 /**
  * Search only window class name.
  * @see xdo_search
  */
-#define SEARCH_CLASSNAME (1UL << 6)
+#define SEARCH_CLASSNAME (1UL << 5)
 
 /**
  * Search a specific desktop
  * @see xdo_search.screen
  * @see xdo_search_windows
  */
-#define SEARCH_DESKTOP (1UL << 7)
+#define SEARCH_DESKTOP (1UL << 6)
 
 /**
  * Search a specific STEAM_GAME ID
  * @see xdo_search.screen
  * @see xdo_search_windows
  */
-#define SEARCH_STEAM (1UL << 8)
+#define SEARCH_STEAM (1UL << 7)
 
 /**
  * The window search query structure.
@@ -111,7 +105,6 @@ typedef struct xdo {
  * @see xdo_search_windows
  */
 typedef struct xdo_search {
-  const char *title;        /** pattern to test against a window title */
   const char *winclass;     /** pattern to test against a window class */
   const char *winclassname; /** pattern to test against a window class */
   const char *winname;      /** pattern to test against a window name */
@@ -150,17 +143,6 @@ typedef struct xdo_search {
  * @return Pointer to a new xdo_t or NULL on failure
  */
 xdo_t *xdo_new(const char *display);
-
-/**
- * Create a new xdo_t instance with an existing X11 Display instance.
- *
- * @param xdpy the Display pointer given by a previous XOpenDisplay()
- * @param display the string display name
- * @param close_display_when_freed If true, we will close the display when
- * xdo_free is called. Otherwise, we leave it open.
- */
-xdo_t *xdo_new_with_opened_display(Display *xdpy, const char *display,
-                                   int close_display_when_freed);
 
 /**
  * Free and destroy an xdo_t instance.

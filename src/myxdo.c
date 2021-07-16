@@ -28,8 +28,6 @@ static int _xdo_match_window_class(const xdo_t *xdo, Window window,
 static int _xdo_match_window_classname(const xdo_t *xdo, Window window,
                                        regex_t *re);
 static int _xdo_match_window_name(const xdo_t *xdo, Window window, regex_t *re);
-static int _xdo_match_window_title(const xdo_t *xdo, Window window,
-                                   regex_t *re);
 static int _xdo_match_window_pid(const xdo_t *xdo, Window window, int pid);
 static int _xdo_match_window_steam_game(const xdo_t *xdo, Window window,
                                         int steam_game);
@@ -86,6 +84,7 @@ static int error_handler(Display *dpy, XErrorEvent *ev) {
 
 xdo_t *xdo_new(const char *display_name) {
   Display *xdpy;
+  xdo_t *xdo = NULL;
 
   if ((xdpy = XOpenDisplay(display_name)) == NULL) {
     /* Can't use _xdo_eprintf yet ... */
@@ -93,29 +92,15 @@ xdo_t *xdo_new(const char *display_name) {
     return NULL;
   }
 
-  if (display_name == NULL) {
-    display_name = getenv("DISPLAY");
-  }
-
-  return xdo_new_with_opened_display(xdpy, display_name, 1);
-}
-
-xdo_t *xdo_new_with_opened_display(Display *xdpy, const char *display,
-                                   int close_display_when_freed) {
-  xdo_t *xdo = NULL;
-
-  if (xdpy == NULL) {
-    /* Can't use _xdo_eprintf yet ... */
-    fprintf(stderr, "xdo_new: xdisplay I was given is a null pointer\n");
+  xdo = malloc(sizeof(xdo_t));
+  if (xdo == NULL) {
+    perror("xdo_new: couldn't allocate xdo_t");
     return NULL;
   }
-
-  /* XXX: Check for NULL here */
-  xdo = malloc(sizeof(xdo_t));
-  memset(xdo, 0, sizeof(xdo_t));
+  memset(xdo, 0, sizeof(xdo_t)); // NOLINT
 
   xdo->xdpy = xdpy;
-  xdo->close_display_when_freed = close_display_when_freed;
+  xdo->close_display_when_freed = 1;
 
   /*if (display == NULL) {
     display = "unknown";
@@ -209,11 +194,11 @@ int _xdo_ewmh_is_supported(const xdo_t *xdo, const char *feature) {
                                                     &type, &size);
   for (i = 0L; i < nitems; i++) {
     if (results[i] == feature_atom) {
-      free(results);
+      XFree(results);
       return True;
     }
   }
-  free(results);
+  XFree(results);
 
   return False;
 }
@@ -245,7 +230,7 @@ int xdo_get_desktop_for_window(const xdo_t *xdo, Window wid, long *desktop) {
   } else {
     *desktop = -1;
   }
-  free(data);
+  XFree(data);
 
   return _is_success("XGetWindowProperty[_NET_WM_DESKTOP]", *desktop == -1,
                      xdo);
@@ -295,7 +280,6 @@ int xdo_search_windows(const xdo_t *xdo, const xdo_search_t *search,
   // printf("Search:\n");
   // printf("onlyvisible: %d\n", search->only_visible);
   // printf("pid: %lu\n", search->pid);
-  // printf("title: %s\n", search->title);
   // printf("name: %s\n", search->winname);
   // printf("class: %s\n", search->winclass);
   // printf("classname: %s\n", search->winclassname);
@@ -303,13 +287,6 @@ int xdo_search_windows(const xdo_t *xdo, const xdo_search_t *search,
 
   return XDO_SUCCESS;
 } /* int xdo_search_windows */
-
-static int _xdo_match_window_title(const xdo_t *xdo, Window window,
-                                   regex_t *re) {
-  fprintf(stderr, "This function (match window by title) is deprecated."
-                  " You want probably want to match by the window name.\n");
-  return _xdo_match_window_name(xdo, window, re);
-} /* int _xdo_match_window_title */
 
 static int _xdo_match_window_name(const xdo_t *xdo, Window window,
                                   regex_t *re) {
@@ -321,7 +298,9 @@ static int _xdo_match_window_name(const xdo_t *xdo, Window window,
   char **list = NULL;
   XTextProperty tp;
 
-  XGetWMName(xdo->xdpy, window, &tp);
+  if (XGetWMName(xdo->xdpy, window, &tp) == 0)
+    return False;
+
   if (tp.nitems > 0) {
     // XmbTextPropertyToTextList(xdo->xdpy, &tp, &list, &count);
     Xutf8TextPropertyToTextList(xdo->xdpy, &tp, &list, &count);
@@ -347,9 +326,7 @@ static int _xdo_match_window_name(const xdo_t *xdo, Window window,
 
 static int _xdo_match_window_class(const xdo_t *xdo, Window window,
                                    regex_t *re) {
-  XWindowAttributes attr;
   XClassHint classhint;
-  XGetWindowAttributes(xdo->xdpy, window, &attr);
 
   if (XGetClassHint(xdo->xdpy, window, &classhint)) {
     // printf("%d: class %s\n", window, classhint.res_class);
@@ -372,9 +349,7 @@ static int _xdo_match_window_class(const xdo_t *xdo, Window window,
 
 static int _xdo_match_window_classname(const xdo_t *xdo, Window window,
                                        regex_t *re) {
-  XWindowAttributes attr;
   XClassHint classhint;
-  XGetWindowAttributes(xdo->xdpy, window, &attr);
 
   if (XGetClassHint(xdo->xdpy, window, &classhint)) {
     if ((classhint.res_name) &&
@@ -412,7 +387,7 @@ int xdo_get_pid_window(const xdo_t *xdo, Window window) {
     /* The data itself is unsigned long, but everyone uses int as pid values */
     window_pid = (int)*((unsigned long *)data);
   }
-  free(data);
+  XFree(data);
 
   return window_pid;
 }
@@ -448,7 +423,7 @@ static int _xdo_match_window_steam_game(const xdo_t *xdo, Window window,
     /* The data itself is unsigned long, but everyone uses int as pid values */
     window_steam_game = (int)*((unsigned long *)data);
   }
-  free(data);
+  XFree(data);
 
   if (steam_game == window_steam_game) {
     return True;
@@ -475,7 +450,8 @@ static int compile_re(const char *pattern, regex_t *re) {
 
 static int _xdo_is_window_visible(const xdo_t *xdo, Window wid) {
   XWindowAttributes wattr;
-  XGetWindowAttributes(xdo->xdpy, wid, &wattr);
+  if (XGetWindowAttributes(xdo->xdpy, wid, &wattr) == 0)
+    return False;
   if (wattr.map_state != IsViewable)
     return False;
 
@@ -484,17 +460,14 @@ static int _xdo_is_window_visible(const xdo_t *xdo, Window wid) {
 
 static int check_window_match(const xdo_t *xdo, Window wid,
                               const xdo_search_t *search) {
-  regex_t title_re;
   regex_t class_re;
   regex_t classname_re;
   regex_t name_re;
 
-  if (!compile_re(search->title, &title_re) ||
-      !compile_re(search->winclass, &class_re) ||
+  if (!compile_re(search->winclass, &class_re) ||
       !compile_re(search->winclassname, &classname_re) ||
       !compile_re(search->winname, &name_re)) {
 
-    regfree(&title_re);
     regfree(&class_re);
     regfree(&classname_re);
     regfree(&name_re);
@@ -505,19 +478,18 @@ static int check_window_match(const xdo_t *xdo, Window wid,
   /* Set this to 1 for dev debugging */
   static const int debug = 0;
 
-  int visible_ok, pid_ok, title_ok, name_ok, class_ok, classname_ok, desktop_ok,
+  int visible_ok, pid_ok, name_ok, class_ok, classname_ok, desktop_ok,
       steam_game_ok;
-  int visible_want, pid_want, title_want, name_want, class_want, classname_want,
+  int visible_want, pid_want, name_want, class_want, classname_want,
       desktop_want, steam_game_want;
 
-  visible_ok = pid_ok = title_ok = name_ok = class_ok = classname_ok =
-      desktop_ok = steam_game_ok = True;
+  visible_ok = pid_ok = name_ok = class_ok = classname_ok = desktop_ok =
+      steam_game_ok = True;
   //(search->require == SEARCH_ANY ? False : True);
 
   desktop_want = search->searchmask & SEARCH_DESKTOP;
   visible_want = search->searchmask & SEARCH_ONLYVISIBLE;
   pid_want = search->searchmask & SEARCH_PID;
-  title_want = search->searchmask & SEARCH_TITLE;
   name_want = search->searchmask & SEARCH_NAME;
   class_want = search->searchmask & SEARCH_CLASS;
   classname_want = search->searchmask & SEARCH_CLASSNAME;
@@ -543,73 +515,69 @@ static int check_window_match(const xdo_t *xdo, Window wid,
     /* Visibility is a hard condition, fail always if we wanted
      * only visible windows and this one isn't */
     if (visible_want && !_xdo_is_window_visible(xdo, wid)) {
-      if (debug)
-        fprintf(stderr, "skip %ld visible\n", wid);
+      /*if (debug)
+        fprintf(stderr, "skip %lx visible\n", wid);*/
       visible_ok = False;
       break;
     }
 
     if (pid_want && !_xdo_match_window_pid(xdo, wid, search->pid)) {
       if (debug)
-        fprintf(stderr, "skip %ld pid\n", wid);
+        fprintf(stderr, "skip %lx pid\n", wid);
       pid_ok = False;
     }
 
     if (steam_game_want &&
         !_xdo_match_window_steam_game(xdo, wid, search->steam_game)) {
       if (debug)
-        fprintf(stderr, "skip %ld steam_game\n", wid);
+        fprintf(stderr, "skip %lx steam_game\n", wid);
       steam_game_ok = False;
     }
 
-    if (title_want && !_xdo_match_window_title(xdo, wid, &title_re)) {
-      if (debug)
-        fprintf(stderr, "skip %ld title\n", wid);
-      title_ok = False;
-    }
-
     if (name_want && !_xdo_match_window_name(xdo, wid, &name_re)) {
-      if (debug)
-        fprintf(stderr, "skip %ld winname\n", wid);
+      /*if (debug)
+        fprintf(stderr, "skip %lx winname\n", wid);*/
       name_ok = False;
     }
 
     if (class_want && !_xdo_match_window_class(xdo, wid, &class_re)) {
       if (debug)
-        fprintf(stderr, "skip %ld winclass\n", wid);
+        fprintf(stderr, "skip %lx winclass\n", wid);
       class_ok = False;
     }
 
     if (classname_want &&
         !_xdo_match_window_classname(xdo, wid, &classname_re)) {
-      if (debug)
-        fprintf(stderr, "skip %ld winclassname\n", wid);
+      /*if (debug)
+        fprintf(stderr, "skip %lx winclassname\n", wid);*/
       classname_ok = False;
     }
   } while (0);
 
-  regfree(&title_re);
   regfree(&class_re);
   regfree(&classname_re);
   regfree(&name_re);
 
   if (debug) {
-    fprintf(
-        stderr,
-        "win: %ld, pid:%d, title:%d, name:%d, class:%d, visible:%d, steam:%d\n",
-        wid, pid_ok, title_ok, name_ok, class_ok, visible_ok, steam_game_ok);
+    if (visible_ok &&
+        ((classname_want && classname_ok) || (name_want && name_ok))) {
+      fprintf(stderr,
+              "win: %lx, pid:%d, name:%d, class:%d, classname:%d, "
+              "visible:%d, steam:%d\n",
+              wid, pid_ok, name_ok, class_ok, classname_ok, visible_ok,
+              steam_game_ok);
+    }
   }
 
   switch (search->require) {
   case SEARCH_ALL:
-    return visible_ok && pid_ok && title_ok && name_ok && class_ok &&
-           classname_ok && desktop_ok && steam_game_ok;
+    return visible_ok && pid_ok && name_ok && class_ok && classname_ok &&
+           desktop_ok && steam_game_ok;
     break;
   case SEARCH_ANY:
     return visible_ok &&
-           ((pid_want && pid_ok) || (title_want && title_ok) ||
-            (name_want && name_ok) || (class_want && class_ok) ||
-            (classname_want && classname_ok) ||
+           ((pid_want && pid_ok) || (name_want && name_ok) ||
+            (class_want && class_ok) || (classname_want && classname_ok) ||
             (steam_game_want && steam_game_ok)) &&
            desktop_ok;
     break;
@@ -656,8 +624,6 @@ static void find_matching_windows(const xdo_t *xdo, Window window,
       XQueryTree(xdo->xdpy, window, &dummy, &dummy, &children, &nchildren);
 
   if (!success) {
-    if (children != NULL)
-      XFree(children);
     return;
   }
 
