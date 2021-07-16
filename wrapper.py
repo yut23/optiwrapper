@@ -663,17 +663,24 @@ if __name__ == "__main__":
     )
 
     # run command
+    logger.debug(
+        "env vars: %s", " ".join(k + "=" + v for k, v in env_override.items()),
+    )
+    logger.debug("CWD: %s", Path().absolute())
     proc = subprocess.Popen(command, env={**os.environ, **env_override})
     if ("window_class" in cfg or "window_title" in cfg) and in_window_manager:
+        logger.debug("in WM, tracking focus")
         ft = FocusThread(cfg)
         ft.start()
 
     if not in_window_manager:
         # add focus event for better time tracking
+        logger.debug("not in WM")
         focus()
 
     if "proc_name" not in cfg:
         # just wait for subprocess to finish
+        logger.debug("waiting on subprocess %d", proc.pid)
         proc.wait()
         logger.debug("subprocess %d done, exiting wrapper", proc.pid)
     else:
