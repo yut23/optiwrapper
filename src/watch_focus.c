@@ -14,55 +14,10 @@ const char *usage = "Usage: %s window ids ...\n";
 static Atom UTF8_STRING = -1;
 static Atom STRING = -1;
 
-/*
-int get_window_prop_wrapper(const xdo_t *xdo, Window window,
-                            const char *property, int index, char **value) {
-  int success = 0;
-  unsigned char *buf = NULL;
-  long nitems;
-  Atom type;
-  int size;
-
-  success = xdo_get_window_property(xdo, window, property, &buf, &nitems, &type,
-                                    &size);
-  if (success != XDO_SUCCESS) {
-    fprintf(stderr, "xdo_get_window_property failed!\n");
-    return false;
-  }
-
-  if (size != 8) {
-    fprintf(stderr, "size is %d\n", size);
-  }
-  if (index >= nitems) {
-    fprintf(stderr, "Invalid index for %s: only %ld items\n", property, nitems);
-    return false;
-  }
-
-  if (type == UTF8_STRING) {
-    *value = (char *)buf;
-    return true;
-  }
-  if (type == STRING) {
-    char *item_ptr = (char *)buf;
-    for (int i = 0; i < index; ++i) {
-      item_ptr += strlen(item_ptr) + 1;
-    }
-    *value = strdup(item_ptr);
-    free(buf);
-    return true;
-  }
-  char *type_name = XGetAtomName(xdo->xdpy, type);
-  fprintf(stderr, "Type for %s not implemented: %s\n", property, type_name);
-  free(type_name);
-  free(buf);
-  return false;
-}
-*/
-
 int watch_focus(Window windows[], int win_count) {
-  xdo_t *xdo = xdo_new(NULL);
+  Display *disp = XOpenDisplay(NULL);
   for (int i = 0; i < win_count; ++i) {
-    int ret = XSelectInput(xdo->xdpy, windows[i], FocusChangeMask);
+    int ret = XSelectInput(disp, windows[i], FocusChangeMask);
     if (!ret) {
       fprintf(stderr, "XSelectInput error: %d\n", ret);
       return ret;
@@ -75,7 +30,7 @@ int watch_focus(Window windows[], int win_count) {
   // main loop
   while (1) {
     XEvent e;
-    XNextEvent(xdo->xdpy, &e);
+    XNextEvent(disp, &e);
 
     switch (e.type) {
     case FocusIn:
@@ -102,7 +57,7 @@ int watch_focus(Window windows[], int win_count) {
     }
   }
 
-  xdo_free(xdo);
+  XCloseDisplay(disp);
 }
 
 int main(int argc, char **argv) {
@@ -132,14 +87,14 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  xdo_t *xdo = xdo_new(NULL);
-  UTF8_STRING = XInternAtom(xdo->xdpy, "UTF8_STRING", 1);
-  STRING = XInternAtom(xdo->xdpy, "STRING", 1);
+  Display *disp = XOpenDisplay(NULL);
+  UTF8_STRING = XInternAtom(disp, "UTF8_STRING", 1);
+  STRING = XInternAtom(disp, "STRING", 1);
   Window window = 0;
   // process windows to watch
   for (int i = optind; i < argc; ++i) {
     window = strtol(argv[i], NULL, 0);
-    int ret = XSelectInput(xdo->xdpy, window, FocusChangeMask);
+    int ret = XSelectInput(disp, window, FocusChangeMask);
     if (!ret) {
       fprintf(stderr, "XSelectInput on window %#lx reported an error: %d\n",
               window, ret);
@@ -160,7 +115,7 @@ int main(int argc, char **argv) {
   // main loop
   while (1) {
     XEvent e;
-    XNextEvent(xdo->xdpy, &e);
+    XNextEvent(disp, &e);
     XFocusInEvent *fie;
     XFocusOutEvent *foe;
     XClassHint window_class;
@@ -170,7 +125,7 @@ int main(int argc, char **argv) {
       fie = (XFocusInEvent *)&e;
       window = fie->window;
       if ((fie->mode == NotifyNormal || fie->mode == NotifyWhileGrabbed)) {
-        XGetClassHint(xdo->xdpy, window, &window_class);
+        XGetClassHint(disp, window, &window_class);
         printf("Got  focus on window %#07lx prev 0x%07lx (%s) \"%s\"\n", window,
                focused, detail_lut[fie->detail], window_class.res_class);
         focused = window;
@@ -181,7 +136,7 @@ int main(int argc, char **argv) {
       window = foe->window;
       if ((foe->mode == NotifyNormal || foe->mode == NotifyWhileGrabbed) &&
           foe->detail != NotifyInferior) {
-        XGetClassHint(xdo->xdpy, window, &window_class);
+        XGetClassHint(disp, window, &window_class);
         printf("Lost focus on window %#07lx prev 0x%07lx (%s) \"%s\"\n", window,
                focused, detail_lut[foe->detail], window_class.res_class);
         focused = 0;
@@ -190,5 +145,5 @@ int main(int argc, char **argv) {
     }
   }
 
-  xdo_free(xdo);
+  XCloseDisplay(disp);
 }
