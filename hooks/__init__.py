@@ -89,9 +89,14 @@ _LOADED_HOOKS: Dict[str, WrapperHook] = dict()
 
 
 def load_hook(name: str) -> None:
+    if "=" in name:
+        name, _args = name.split("=", maxsplit=1)
+        args = _args.split(",")
+    else:
+        args = []
     if name not in _REGISTERED_HOOKS:
         raise ValueError(f"Hook not found: {name!r}")
-    _LOADED_HOOKS[name] = _REGISTERED_HOOKS[name]()
+    _LOADED_HOOKS[name] = _REGISTERED_HOOKS[name](*args)
     logger.debug("loaded hook %r", name)
 
 
