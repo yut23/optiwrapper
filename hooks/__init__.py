@@ -101,7 +101,6 @@ def get_hooks() -> Dict[str, WrapperHook]:
 
 def register_hooks() -> None:
     basedir = dirname(realpath(__file__))
-    print(basedir)
 
     for filename in glob.glob(join(basedir, "*.py")):
         module = splitext(split(filename)[-1])[0]
