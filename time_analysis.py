@@ -2,7 +2,6 @@
 """
 Analyzes playtime logs.
 """
-# pylint: disable=invalid-name, missing-docstring, too-few-public-methods
 
 import datetime
 import functools
@@ -43,6 +42,9 @@ class Segment(NamedTuple):
     duration: datetime.timedelta
 
 
+# Notes:
+# (LEAVE, LEAVE): short, can probably be discarded
+# (LEAVE, START) should have a STOP inserted with the same timestamp as LEAVE
 EVENT_PAIRS = {
     (START, START): None,
     (START, STOP): "keep",
@@ -103,8 +105,11 @@ def process(events: List[Event], print_invalid: bool = True) -> List[Segment]:
         if action is None:
             if print_invalid:
                 print(
-                    "Invalid event combination: {:s}, {:s} (line {})".format(
-                        curr_evt.event, next_evt.event, line_num
+                    "Invalid event combination: {:>6s}, {:6s} at line {:5d}, duration {:11.3f}s".format(
+                        curr_evt.event.name,
+                        next_evt.event.name,
+                        line_num,
+                        (next_evt.time - curr_evt.time).total_seconds(),
                     )
                 )
         elif action == "keep":
@@ -154,4 +159,7 @@ if __name__ == "__main__":
     active_time = functools.reduce(operator.add, (s.duration for s in all_segs))
     print("Total run time:    {}".format(run_time))
     if any(e.event in (LEAVE, RETURN) for e in evts):
-        print("Total active time: {}".format(active_time))
+        msg = "active"
+    else:
+        msg = "run"
+    print("Total {} time: {}".format(msg, active_time))
