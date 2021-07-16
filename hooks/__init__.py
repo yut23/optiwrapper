@@ -14,6 +14,35 @@ logger = logging.getLogger("optiwrapper." + __name__)
 def run(
     *args: Any, is_32_bit: bool = False, **kwargs: Any
 ) -> "subprocess.CompletedProcess[Any]":
+    """run(args: _CMD, bufsize: int, executable: Optional[AnyPath], stdin: _FILE, stdout: _FILE, stderr: _FILE, preexec_fn: Callable[[], Any], close_fds: bool, shell: bool, cwd: Optional[AnyPath], env: Optional[_ENV], universal_newlines: bool, startupinfo: Any, creationflags: int, restore_signals: bool, start_new_session: bool, pass_fds: Any, *, is_32_bit: bool, capture_output: bool, check: bool, encoding: Optional[str], errors: Optional[str], input: Optional[_TXT], text: Optional[bool], timeout: Optional[float]) -> CompletedProcess[Any]
+
+Run command with arguments and return a CompletedProcess instance.
+
+The returned instance will have attributes args, returncode, stdout and
+stderr. By default, stdout and stderr are not captured, and those attributes
+will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them.
+
+If check is True and the exit code was non-zero, it raises a
+CalledProcessError. The CalledProcessError object will have the return code
+in the returncode attribute, and output & stderr attributes if those streams
+were captured.
+
+If timeout is given, and the process takes too long, a TimeoutExpired
+exception will be raised.
+
+There is an optional argument "input", allowing you to
+pass bytes or a string to the subprocess's stdin.  If you use this argument
+you may not also use the Popen constructor's "stdin" argument, as
+it will be used internally.
+
+By default, all communication is in bytes, and therefore any "input" should
+be bytes, and the stdout and stderr will be bytes. If in text mode, any
+"input" should be a string, and stdout and stderr will be strings decoded
+according to locale encoding, or by "encoding" if set. Text mode is
+triggered by setting any of text, encoding, errors or universal_newlines.
+
+The other arguments are the same as for the Popen constructor.
+"""
     kwargs = kwargs.copy()
     env_override = remove_overlay(is_32_bit)
     if "env" in kwargs:
@@ -23,6 +52,9 @@ def run(
     if "check" not in kwargs:
         kwargs["check"] = True
     return subprocess.run(*args, **kwargs)  # pylint: disable=subprocess-run-check
+
+
+run.__doc__ = subprocess.run.__doc__
 
 
 def check_output(*args: Any, is_32_bit: bool = False, **kwargs: Any) -> str:
