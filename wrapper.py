@@ -69,6 +69,18 @@ ConfigKeys = Literal[
 ]
 
 
+class GpuType(enum.Enum):
+    # pylint: disable=missing-docstring
+    UNKNOWN = enum.auto()
+    INTEL = enum.auto()
+    # INTEL_NOUVEAU = enum.auto()
+    NVIDIA = enum.auto()
+    BUMBLEBEE = enum.auto()
+
+
+GPU_TYPE = GpuType.UNKNOWN
+
+
 CONFIG_DEFAULTS = ConfigDict(
     use_gpu=True, fallback=True, use_primus=True, force_vsync=True, is_32_bit=False
 )
@@ -170,6 +182,31 @@ class Event(enum.Enum):
     UNFOCUS = enum.auto()
     FOCUS = enum.auto()
     DIE = enum.auto()
+
+
+def get_gpu_type(needs_gpu: bool) -> GpuType:
+    # construct_command_line
+    if (
+        os.environ.get("NVIDIA_XRUN") is not None
+        or os.readlink("/etc/X11/xorg.conf.d/20-dgpu.conf")
+        == "/etc/X11/video/20-nvidia.conf"
+    ):
+        return GpuType.NVIDIA
+
+    # from main
+    if needs_gpu:
+        try:
+            optirun_works = (
+                subprocess.run(["optirun", "--silent", "true"], check=True).returncode
+                == 0
+            )
+        except FileNotFoundError:
+            optirun_works = False
+
+        if optirun_works:
+            return GpuType.BUMBLEBEE
+        return GpuType.INTEL
+    return GpuType.UNKNOWN
 
 
 def format_config(config: ConfigDict) -> str:
@@ -369,12 +406,12 @@ def construct_command_line(config: ConfigDict) -> Tuple[List[str], Dict[str, str
     cmd_args: List[str] = []
     environ: Dict[str, str] = dict()
     # check if we're running under nvidia-xrun
-    if os.environ.get("NVIDIA_XRUN") is not None:
+    if GPU_TYPE is GpuType.NVIDIA:
         if not config["force_vsync"]:
             environ["__GL_SYNC_TO_VBLANK"] = "0"
+    elif not config["force_vsync"]:
+        environ["vblank_mode"] = "0"
     elif config["use_gpu"]:
-        if config["use_primus"] and not config["force_vsync"]:
-            environ["vblank_mode"] = "0"
         cmd_args.append("optirun")
         if logger.level == logging.DEBUG:
             cmd_args.append("--debug")
@@ -588,27 +625,21 @@ if __name__ == "__main__":
         logger.error(cfg_err_msg)
         sys.exit(1)
 
-    # check if discrete GPU works, notify if not
-    if cfg["use_gpu"] and os.environ.get("NVIDIA_XRUN") is None:
-        try:
-            optirun_works = (
-                subprocess.run(["optirun", "--silent", "true"], check=True).returncode
-                == 0
-            )
-        except FileNotFoundError:
-            optirun_works = False
+    GPU_TYPE = get_gpu_type(needs_gpu=cfg["use_gpu"])
+    logger.debug("GPU: %s", GPU_TYPE)
 
-        if not optirun_works:
-            if cfg["fallback"]:
-                notify(
-                    "Discrete GPU not working, falling back to integrated GPU",
-                    logging.ERROR,
-                    True,
-                )
-                cfg["use_gpu"] = False
-            else:
-                notify("Discrete GPU not working, quitting", logging.ERROR, True)
-                sys.exit(1)
+    # check if discrete GPU works, notify if not
+    if cfg["use_gpu"] and GPU_TYPE not in (GpuType.NVIDIA, GpuType.BUMBLEBEE):
+        if cfg["fallback"]:
+            notify(
+                "Discrete GPU not working, falling back to integrated GPU",
+                logging.ERROR,
+                True,
+            )
+            cfg["use_gpu"] = False
+        else:
+            notify("Discrete GPU not working, quitting", logging.ERROR, True)
+            sys.exit(1)
 
     if args.test:
         print(dump_test_config(cfg))
