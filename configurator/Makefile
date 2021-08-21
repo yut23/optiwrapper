@@ -1,5 +1,5 @@
-ui_settingswindow.py: SettingsWindow.ui
-	uic -g python $< > $@
+ui/settingswindow.py: SettingsWindow.ui
+	uic -g python -o $@ $<
 
 clean:
-	rm -f ui_settingswindow.py
+	rm -f ui/*.py

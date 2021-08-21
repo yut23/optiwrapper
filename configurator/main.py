@@ -4,7 +4,7 @@ import sys
 from PySide2.QtCore import QFile
 from PySide2.QtWidgets import QApplication, QMainWindow
 
-from ui_settingswindow import Ui_SettingsWindow
+from ui.settingswindow import Ui_SettingsWindow
 
 
 class MainWindow(QMainWindow):
