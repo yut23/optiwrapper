@@ -2,6 +2,8 @@ from . import WrapperHook, run
 
 
 class Hook(WrapperHook):
+    """Stop ananicy while focused"""
+
     def __init__(self) -> None:
         self.stopped = False
 

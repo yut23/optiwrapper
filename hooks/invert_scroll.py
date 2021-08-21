@@ -4,6 +4,8 @@ from . import WrapperHook
 
 
 class Hook(WrapperHook):
+    """Invert mouse scroll direction"""
+
     def __init__(self) -> None:
         self.display = display.Display()
 

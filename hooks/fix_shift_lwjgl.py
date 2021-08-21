@@ -4,6 +4,8 @@ from . import WrapperHook
 
 
 class Hook(WrapperHook):
+    """Fix shift key in LWJGL games (GNOME)"""
+
     XKB_OPTIONS_SCHEMA = "org.gnome.desktop.input-sources"
     XKB_OPTIONS_KEY = "xkb-options"
     BAD_OPTION = "shift:both_capslock"

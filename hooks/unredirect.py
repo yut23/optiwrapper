@@ -6,6 +6,7 @@ UUID = "unredirect@vaina.lt"
 
 
 class Hook(WrapperHook):
+    """Enable fullscreen unredirection (GNOME)"""
     def __init__(self) -> None:
         self.enabled = gnome_shell_ext.is_extension_enabled(UUID)
 

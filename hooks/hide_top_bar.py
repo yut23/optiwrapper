@@ -6,6 +6,8 @@ UUID = "hidetopbar@mathieu.bidon.ca"
 
 
 class Hook(WrapperHook):
+    """Hide top panel (GNOME)"""
+
     def __init__(self) -> None:
         self.enabled = True
         self.enabled = not gnome_shell_ext.is_extension_enabled(UUID)

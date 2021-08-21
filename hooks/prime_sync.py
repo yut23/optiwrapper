@@ -9,6 +9,8 @@ prop_name = "PRIME Synchronization"
 
 
 class Hook(WrapperHook):
+    """Disable PRIME synchronization"""
+
     def __init__(self) -> None:
         self.d = display.Display()
         self.outputs = list()

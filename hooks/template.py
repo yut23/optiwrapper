@@ -2,6 +2,8 @@ from . import WrapperHook
 
 
 class Hook(WrapperHook):
+    """Short description"""
+
     def __init__(self) -> None:
         pass
 

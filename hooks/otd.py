@@ -2,6 +2,8 @@ from . import WrapperHook, run
 
 
 class Hook(WrapperHook):
+    """Change OTD settings while running"""
+
     def __init__(self, cfg_name: str):
         self.cfg_name = cfg_name
 

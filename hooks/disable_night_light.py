@@ -8,6 +8,8 @@ INTERFACE = "org.gnome.SettingsDaemon.Color"
 
 
 class Hook(WrapperHook):
+    """Disable blue light filter (GNOME)"""
+
     def __init__(self) -> None:
         self.enabled = False
         try:

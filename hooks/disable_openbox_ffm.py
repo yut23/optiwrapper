@@ -1,4 +1,3 @@
-"""Disable focus-follows-mouse in Openbox."""
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -6,6 +5,8 @@ from . import WrapperHook, run
 
 
 class Hook(WrapperHook):
+    """Disable focus-follows-mouse (Openbox)"""
+
     config_path = Path.home() / ".config/openbox/rc.xml"
 
     def on_focus(self) -> None:

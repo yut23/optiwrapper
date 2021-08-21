@@ -7,6 +7,8 @@ lock_file = "/var/lib/touchpad/disable.lock"
 
 
 class Hook(WrapperHook):
+    """Disable laptop touchpad"""
+
     def __init__(self) -> None:
         self.enabled = True
         output = check_output([touchpad_cmd, "get"])

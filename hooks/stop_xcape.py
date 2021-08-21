@@ -4,6 +4,8 @@ from . import WrapperHook
 
 
 class Hook(WrapperHook):
+    """Suspend xcape while focused"""
+
     def __init__(self) -> None:
         self.xcape_procs = pgrep("xcape .*Control_L", match_full=True)
 

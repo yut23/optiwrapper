@@ -1,10 +1,13 @@
 import subprocess
+
 from . import WrapperHook, check_output, run
 
 TOOL = "mouse-accel"
 
 
 class Hook(WrapperHook):
+    """Disable mouse acceleration"""
+
     def __init__(self) -> None:
         self.original_states = dict()
         output = check_output([TOOL, "get"], text=True)
