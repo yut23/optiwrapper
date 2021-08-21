@@ -1,0 +1,10 @@
+command:
+- /usr/local/bin/osu-lazer
+flags:
+  use_gpu: false
+  vsync: false
+window_title: ^osu\!lazer$
+hooks:
+- hide_top_bar
+- unredirect
+- otd=osu.json

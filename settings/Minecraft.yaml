@@ -1,0 +1,7 @@
+flags:
+  use_gpu: true
+  fallback: true
+  vsync: false
+window_class: Minecraft 1\.[0-9.]*
+hooks:
+- stop_xcape

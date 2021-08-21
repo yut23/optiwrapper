@@ -1,0 +1,30 @@
+#command:
+#- /usr/bin/example
+#- first argument
+#- second argument
+
+#flags:
+#  use_gpu: true
+#  fallback: true
+#  use_primus: true
+#  vsync: true
+#  is_64_bit: true
+
+## The process name, for tracking when the game has exited. Only needed if the
+## initial process isn't the same as the actual game (e.g. a launcher)
+#process_name: example
+
+## Name of main game window (regex)
+#window_title: ^Example$
+
+## Window classname of main game window (regex, must match entire string)
+## Can be found by looking at the first string returned by `xprop WM_CLASS`.
+#window_class: example_classname
+
+#hooks:
+#- stop_xcape
+#- stop_ananicy
+#- invert_scroll
+#- prime_sync
+#- otd=
+#- otd_focus=

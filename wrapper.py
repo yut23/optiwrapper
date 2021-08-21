@@ -7,29 +7,16 @@ playtime, and more.
 
 import argparse
 import atexit
-import configparser
 import enum
 import logging
 import os
-import shlex
 import signal
 import subprocess
 import sys
 import threading
 import time
 from pathlib import Path
-from typing import (
-    Any,
-    Dict,
-    List,
-    Literal,
-    Optional,
-    Set,
-    Tuple,
-    TypedDict,
-    Union,
-    cast,
-)
+from typing import Any, Dict, List, Set, Tuple, Union
 
 import arrow
 import notify2
@@ -37,37 +24,9 @@ from notify2 import dbus
 
 import hooks
 import lib
-from lib import pgrep, watch_focus
+from lib import CONFIG_DIR, WRAPPER_DIR, logger, pgrep, watch_focus
 from libxdo import xdo_free, xdo_new, xdo_search_windows
-
-
-class ConfigDict(TypedDict, total=False):
-    cmd: List[str]
-    game: str
-    use_gpu: bool
-    fallback: bool
-    use_primus: bool
-    force_vsync: bool
-    is_32_bit: bool
-    proc_name: str
-    window_title: str
-    window_class: str
-    hooks: List[str]
-
-
-ConfigKeys = Literal[
-    "cmd",
-    "game",
-    "use_gpu",
-    "fallback",
-    "use_primus",
-    "force_vsync",
-    "is_32_bit",
-    "proc_name",
-    "window_title",
-    "window_class",
-    "hooks",
-]
+from settings import Config
 
 
 class GpuType(enum.Enum):
@@ -82,15 +41,6 @@ class GpuType(enum.Enum):
 GPU_TYPE = GpuType.UNKNOWN
 
 
-CONFIG_DEFAULTS = ConfigDict(
-    use_gpu=True, fallback=True, use_primus=True, force_vsync=True, is_32_bit=False
-)
-
-
-CONFIG_TYPES = cast(
-    Dict[ConfigKeys, type], ConfigDict.__annotations__  # pylint: disable=no-member
-)
-
 # constants
 WINDOW_WAIT_TIME = 60
 PROCESS_WAIT_TIME = 20
@@ -98,7 +48,6 @@ PROCESS_WAIT_TIME = 20
 
 # logging
 
-logger = logging.getLogger("optiwrapper")  # pylint: disable=invalid-name
 logger.setLevel(logging.WARN)
 logger.propagate = False
 LOGFILE_FORMATTER = logging.Formatter(
@@ -122,57 +71,51 @@ sys.excepthook = handle_exception
 TIME_LOGFILE = None
 
 
-# constants
-GAMES_DIR = Path.home() / "Games"
-WRAPPER_DIR = GAMES_DIR / "wrapper"
-
 DESC = """
 A generic game wrapper script that can run the game on the discrete GPU, turn
 off xcape while the game is focused, log playtime, and more.
 """
 EPILOG = """
 Game-specific configuration (command to run, whether to use primus, etc) should
-be put in ~/Games/wrapper/config/<GAME>.cfg. Run with "-h config" for more
+be put in ~/Games/wrapper/settings/<GAME>.yaml. Run with "-h config" for more
 information.
 
 Examples:
   With a configuration file: %(prog)s -G Infinifactory
-  For a Steam game: %(prog)s %%command%%
+  For a Steam game: %(prog)s -G Game %%command%%
 """
 CONFIG_HELP = """
 Configuration file:
-The following are loaded as variables from ~/Games/wrapper/config/<game>.cfg.
-Boolean values are either "y" or "n".
+The following are keys in a mapping, read from ~/Games/wrapper/settings/<game>.yaml.
 
-CMD: The command to run, as an array of arguments. If specified, any arguments
-  passed on the command line will be ignored.
+command:
+    A sequence of strings, where the first is the command to run, followed by
+    any arguments. If specified, the command and arguments passed on the
+    command line will be ignored.
 
-GAME: The game's name (only needed if the config file is specified using a path)
+flags: A mapping to boolean values. All flags default to true.
+  use_gpu:    Try to run on the discrete GPU
+  fallback:   If the discrete GPU is unavailable, then run without it
+  use_primus: Use the primus backend for optirun
+  vsync:      Enable vsync (reduces tearing, but more input lag)
+  is_64_bit:  Used to remove the extra Steam gameoverlay.so LD_PRELOAD entry
 
-USE_GPU [y]: Whether to run on the discrete GPU
+process_name:
+    The process name, for tracking when the game has exited. Only needed if the
+    initial process isn't the same as the actual game (e.g. a launcher)
 
-FALLBACK [y]: Whether to run the game even if the discrete GPU is unavailable
+window_title:
+    Name of main game window (regular expression).
+    Can be found in the Alt-Tab menu or "xprop _NET_WM_NAME".
 
-USE_PRIMUS [y]: Whether to run with primus (optirun -b primus)
+window_class:
+    Class of main game window (regular expression, must match entire string).
+    Can be found by looking at the first string returned by "xprop WM_CLASS".
 
-FORCE_VSYNC [y]: Whether to run primus with vblank_mode=0
-
-IS_32_BIT [n]: Whether the executable is 32-bit (for removing extra Steam
-  gameoverlay.so entry)
-
-PROC_NAME: The process name, for tracking when the game has exited. Only needed
-  if the initial process isn't the same as the actual game (e.g. a launcher)
-
-WINDOW_TITLE: Name of main game window (can use regular expressions). Can be
-  found through Alt-Tab menu or "xprop _NET_WM_NAME".
-
-WINDOW_CLASS: Class of main game window (must match exactly). Can be found by
-  looking at the first string returned by "xprop WM_CLASS".
-
-HOOKS: Names of files to load from ~/Games/wrapper/hooks/. Common hooks:
-  hide_top_bar: Hides the top menu bar when the game is focused.
-  stop_xcape: Disables xcape (maps ctrl to escape) while the game is focused.
-  mouse_accel: Disables mouse acceleration while the game is focused.
+hooks: A sequence of modules to load from ~/Games/wrapper/hooks/. Common hooks:
+  - stop_xcape: Disables xcape (maps ctrl to escape) while the game is focused.
+  - hide_top_bar: Hides the top menu bar (in GNOME) when the game is focused.
+  - invert_scroll: Inverts the direction of the scroll wheel while in-game.
 """
 
 
@@ -210,127 +153,43 @@ def get_gpu_type(needs_gpu: bool) -> GpuType:
     return GpuType.UNKNOWN
 
 
-def format_config(config: ConfigDict) -> str:
-    """
-    Pretty-formats a set of config options.
-    """
-    out = []
-    option_width = max(len(o) for o in config.keys()) + 1
-    for option, value in config.items():
-        out.append("{:<{width}s} {}".format(option + ":", value, width=option_width))
-    return "\n".join(out)
-
-
-def dump_test_config(config: ConfigDict) -> str:
+def dump_test_config(config: Config) -> str:
     """
     Dumps a set of config files for comparing against the bash script.
     """
     out = []
-    out.append("COMMAND: " + " ".join(map("{:s}".format, config["cmd"])))
+    out.append("COMMAND: " + " ".join(map(str, config.command)))
 
     out.append("OUTPUT_FILES:")
     for outfile in sorted(LOGFILES):
-        out.append(' "{:s}"'.format(outfile))
+        out.append(f' "{outfile}"')
 
-    def dump(name: ConfigKeys) -> None:
+    def dump_flag(name: str) -> None:
         option = name.upper()
-        type_ = CONFIG_TYPES[name]
-        val = config.get(name, None)
-        if val is None:
-            out.append("{:s}:".format(option))
-        elif type_ is str or type_ is Path:
-            out.append('{:s}: "{:s}"'.format(option, val))
-        elif type_ is bool:
-            out.append('{:s}: "{:s}"'.format(option, "y" if val else "n"))
-        elif type_ is List[str]:
-            out.append(
-                "{:s}: {:s}".format(
-                    option, " ".join(map('"{:s}"'.format, cast(List[str], val)))
-                )
-            )
+        flag_val = "y" if getattr(config.flags, name) else "n"
+        out.append(f'{option}: "{flag_val}"')
+
+    def dump(name: str) -> None:
+        option = name.upper()
+        val: Union[str, List[str]] = getattr(config, name)
+        if not val:
+            out.append(f"{option}:")
+        elif isinstance(val, (str, Path)):
+            out.append(f'{option}: "{val}"')
+        elif isinstance(val, list):
+            out.append("{}: {}".format(option, " ".join(map('"{:s}"'.format, val))))
 
     dump("game")
-    dump("use_gpu")
-    dump("fallback")
-    dump("use_primus")
-    dump("force_vsync")
-    dump("proc_name")
+    dump_flag("use_gpu")
+    dump_flag("fallback")
+    dump_flag("use_primus")
+    dump_flag("vsync")
+    dump("process_name")
     dump("window_title")
     dump("window_class")
     dump("hooks")
 
     return "\n".join(out)
-
-
-class ConfigException(Exception):
-    """
-    An error caused by an invalid configuration file.
-    """
-
-
-def parse_config_file(data: str) -> ConfigDict:
-    """
-    Parses the contents of a configuration file.
-    """
-
-    def parse_option(option: str, value: Any) -> Tuple[ConfigKeys, Any]:
-        if option.lower() not in CONFIG_TYPES:
-            raise ConfigException("Invalid option: {}".format(option))
-        dest = cast(ConfigKeys, option.lower())
-        type_ = CONFIG_TYPES[dest]
-
-        if type_ is str:
-            vals = shlex.split(value)
-            if len(vals) == 1:
-                # strip quotes if there's only one string
-                return dest, vals[0]
-            return dest, value
-        if type_ is List[str]:
-            if not (value and value[0] == "(" and value[-1] == ")"):
-                raise ConfigException(
-                    "{} must be an array, surrounded by parens".format(option)
-                )
-            return dest, shlex.split(value[1:-1])
-        if type_ is bool:
-            if value not in ("y", "n"):
-                raise ConfigException('{} must be "y" or "n"'.format(option))
-            return dest, value == "y"
-        if type_ is Path:
-            return dest, Path(value).expanduser().absolute()
-        raise ConfigException("Internal error: argument type not found for " + option)
-
-    config_p = configparser.ConfigParser()
-    config_p.optionxform = str  # type: ignore
-    config_p.read_string("[section]\n" + data)
-    config = ConfigDict()
-    for opt, val in config_p.items("section"):
-        dest, value = parse_option(opt, val)
-        config[dest] = value
-
-    return config
-
-
-def check_config(config: ConfigDict) -> Optional[str]:
-    """
-    Checks if a configuration is valid.
-
-    Returns None if it is valid, or an error message if not.
-    """
-    # a command is required
-    if not config["cmd"]:
-        return "No command specified"
-
-    # the command must be a valid executable
-    if not os.path.isfile(config["cmd"][0]):
-        return 'The file "{:s}" specified for command does not exist.'.format(
-            config["cmd"][0]
-        )
-    if not os.access(config["cmd"][0], os.X_OK):
-        return 'The file "{:s}" specified for command is not executable.'.format(
-            config["cmd"][0]
-        )
-
-    return None
 
 
 def setup_logfile(logfile: Any) -> None:
@@ -348,59 +207,54 @@ def setup_logfile(logfile: Any) -> None:
 
 def get_config(
     args: argparse.Namespace,  # pylint: disable=redefined-outer-name
-) -> ConfigDict:
+) -> Config:
     """
     Constructs a configuration from the given arguments.
     """
-    config = CONFIG_DEFAULTS.copy()
-
     # order of configuration precedence, from highest to lowest:
     #  1. command line parameters (<command>, --hide-top-bar, --no-discrete)
     #  2. game configuration file (--game)
 
     # parse game config file
-    config["game"] = args.game
-    assert config["game"] is not None
+    assert args.game is not None
     try:
-        with open(WRAPPER_DIR / "config" / (config["game"] + ".cfg")) as file:
-            config_data = file.read()
-        config.update(parse_config_file(config_data))
+        config = Config.load(args.game)
     except OSError:
         logger.error(
             'The configuration file for "%s" was not found in %s.',
-            config["game"],
-            WRAPPER_DIR / "config",
+            args.game,
+            CONFIG_DIR,
         )
         sys.exit(1)
 
-    setup_logfile(WRAPPER_DIR / "logs" / (config["game"] + ".log"))
+    setup_logfile(WRAPPER_DIR / "logs" / f"{config.game}.log")
 
     # check arguments
     if args.command:
         # print('cli command:', args.command)
-        if "cmd" not in config or not config["cmd"]:
-            config["cmd"] = args.command
-        elif "cmd" in config and config["cmd"]:
-            if config["cmd"][0] != args.command[0]:
+        if not config.command:
+            config.command = args.command
+        else:
+            if config.command[0] != args.command[0]:
                 logger.warning(
                     "Different command given in config file and command line"
                 )
-            config["cmd"] = args.command
+            config.command = args.command
 
     if args.use_gpu is not None:
-        config["use_gpu"] = args.use_gpu
+        config.flags.use_gpu = args.use_gpu
 
     if args.hide_top_bar is not None:
-        if "hooks" in config:
-            if "hide_top_bar" not in config["hooks"]:
-                config["hooks"].append("hide_top_bar")
+        if config.hooks:
+            if "hide_top_bar" not in config.hooks:
+                config.hooks.append("hide_top_bar")
         else:
-            config["hooks"] = ["hide_top_bar"]
+            config.hooks = ["hide_top_bar"]
 
     return config
 
 
-def construct_command_line(config: ConfigDict) -> Tuple[List[str], Dict[str, str]]:
+def construct_command_line(config: Config) -> Tuple[List[str], Dict[str, str]]:
     """
     Constructs a full command line and environment dict from a configuration
     """
@@ -408,18 +262,18 @@ def construct_command_line(config: ConfigDict) -> Tuple[List[str], Dict[str, str
     environ: Dict[str, str] = dict()
     # check if we're running under nvidia-xrun
     if GPU_TYPE is GpuType.NVIDIA:
-        if not config["force_vsync"]:
+        if not config.flags.vsync:
             environ["__GL_SYNC_TO_VBLANK"] = "0"
-    elif not config["force_vsync"]:
+    elif not config.flags.vsync:
         environ["vblank_mode"] = "0"
-    elif config["use_gpu"]:
+    elif config.flags.use_gpu:
         cmd_args.append("optirun")
-        if logger.level == logging.DEBUG:
+        if logger.isEnabledFor(logging.DEBUG):
             cmd_args.append("--debug")
-        if config["use_primus"]:
+        if config.flags.use_primus:
             cmd_args.extend("-b primus".split())
-    if "cmd" in config:
-        cmd_args.extend(config["cmd"])
+    if config.command:
+        cmd_args.extend(config.command)
     return cmd_args, environ
 
 
@@ -501,17 +355,17 @@ def unfocus() -> None:
 
 
 class FocusThread(threading.Thread):
-    def __init__(self, config: ConfigDict):
+    def __init__(self, config: Config):
         super().__init__()
         self.daemon = True
         self.kwargs: Dict[str, Union[bool, int, str]] = {
             "only_visible": True,
             "require_all": True,  # require all conditions to match
         }
-        if "window_title" in config:
-            self.kwargs["winname"] = config["window_title"]
-        if "window_class" in config:
-            self.kwargs["winclassname"] = "^" + config["window_class"] + "$"
+        if config.window_title:
+            self.kwargs["winname"] = config.window_title
+        if config.window_class:
+            self.kwargs["winclassname"] = "^" + config.window_class + "$"
 
     def run(self) -> None:
         # if a window is closed, search for new matching windows again
@@ -544,7 +398,7 @@ class FocusThread(threading.Thread):
                 return
             logger.debug("found window: 0x%x", wins[0])
             closed_win = next(
-                watch_focus(wins, lambda evt: focus(), lambda evt: unfocus(),)
+                watch_focus(wins, lambda evt: focus(), lambda evt: unfocus())
             )
             logger.debug("watch_focus returned %x", closed_win)
             time.sleep(0.1)
@@ -588,13 +442,12 @@ if __name__ == "__main__":
         "-G",
         "--game",
         metavar="GAME",
-        required=True,
-        help=("specify a game (will search for a config file)"),
+        help="specify a game (will search for a config file)",
     )
     parser.add_argument(
         "-f",
         "--hide-top-bar",
-        help=("hide the top bar (needed for fullscreen in some games)"),
+        help="hide the top bar (needed for fullscreen in some games)",
         action="store_true",
         default=None,
     )
@@ -613,7 +466,7 @@ if __name__ == "__main__":
         "-o",
         "--output",
         metavar="FILE",
-        help=("log all output to a file (will overwrite, not append)"),
+        help="log all output to a file (will overwrite, not append)",
         dest="outfile",
     )
     parser.add_argument("-c", "--classname", help="window classname to match against")
@@ -628,6 +481,9 @@ if __name__ == "__main__":
         parser.print_help()
         sys.exit(0)
 
+    if args.game is None:
+        parser.error("the following arguments are required: -G/--game")
+
     # setup logging
     if args.debug:
         logger.setLevel(logging.DEBUG)
@@ -637,23 +493,23 @@ if __name__ == "__main__":
 
     cfg = get_config(args)
 
-    cfg_err_msg = check_config(cfg)
+    cfg_err_msg = cfg.check()
     if cfg_err_msg is not None:
         logger.error(cfg_err_msg)
         sys.exit(1)
 
-    GPU_TYPE = get_gpu_type(needs_gpu=cfg["use_gpu"])
+    GPU_TYPE = get_gpu_type(needs_gpu=cfg.flags.use_gpu)
     logger.debug("GPU: %s", GPU_TYPE)
 
     # check if discrete GPU works, notify if not
-    if cfg["use_gpu"] and GPU_TYPE not in (GpuType.NVIDIA, GpuType.BUMBLEBEE):
-        if cfg["fallback"]:
+    if cfg.flags.use_gpu and GPU_TYPE not in (GpuType.NVIDIA, GpuType.BUMBLEBEE):
+        if cfg.flags.fallback:
             notify(
                 "Discrete GPU not working, falling back to integrated GPU",
                 logging.ERROR,
                 True,
             )
-            cfg["use_gpu"] = False
+            cfg.flags.use_gpu = False
         else:
             notify("Discrete GPU not working, quitting", logging.ERROR, True)
             sys.exit(1)
@@ -662,13 +518,12 @@ if __name__ == "__main__":
         print(dump_test_config(cfg))
         sys.exit(0)
 
-    logger.debug("\n%s", format_config(cfg))
+    logger.debug("\n%s", cfg.pretty())
 
     # setup time logging
-    if "game" in cfg:
-        TIME_LOGFILE = WRAPPER_DIR / "time/{}.log".format(cfg["game"])
-        # create directory if it doesn't exist
-        TIME_LOGFILE.parent.mkdir(parents=True, exist_ok=True)
+    TIME_LOGFILE = WRAPPER_DIR / f"time/{cfg.game}.log"
+    # create directory if it doesn't exist
+    TIME_LOGFILE.parent.mkdir(parents=True, exist_ok=True)
 
     # setup command
     command, env_override = construct_command_line(cfg)
@@ -676,11 +531,11 @@ if __name__ == "__main__":
 
     # load hooks
     hooks.register_hooks()
-    for hook_name in cfg.get("hooks", []):
+    for hook_name in cfg.hooks:
         hooks.load_hook(hook_name)
 
     # remove overlay library for wrong architecture
-    env_override.update(lib.remove_overlay(cfg["is_32_bit"]))
+    env_override.update(lib.remove_overlay(cfg.flags.is_64_bit))
     if "LD_PRELOAD" in env_override:
         logger.debug('Fixed LD_PRELOAD: now "%s"', env_override["LD_PRELOAD"])
 
@@ -712,11 +567,12 @@ if __name__ == "__main__":
 
     # run command
     logger.debug(
-        "env vars: %s", " ".join(k + "=" + v for k, v in env_override.items()),
+        "env vars: %s",
+        " ".join(k + "=" + v for k, v in env_override.items()),
     )
     logger.debug("CWD: %s", Path().absolute())
     proc = subprocess.Popen(command, env={**os.environ, **env_override})
-    if ("window_class" in cfg or "window_title" in cfg) and in_window_manager:
+    if (cfg.window_class or cfg.window_title) and in_window_manager:
         logger.debug("in WM, tracking focus")
         ft = FocusThread(cfg)
         ft.start()
@@ -726,7 +582,7 @@ if __name__ == "__main__":
         logger.debug("not in WM")
         focus()
 
-    if "proc_name" not in cfg:
+    if not cfg.process_name:
         # just wait for subprocess to finish
         logger.debug("waiting on subprocess %d", proc.pid)
         proc.wait()
@@ -734,7 +590,7 @@ if __name__ == "__main__":
     else:
         # find process
         time.sleep(2)
-        pattern = cfg["proc_name"]
+        pattern = cfg.process_name
         proc_start_time = time.time()
         procs = pgrep(pattern)
         logger.debug("found: %s", procs)

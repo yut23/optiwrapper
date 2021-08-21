@@ -1,0 +1,6 @@
+flags:
+  use_gpu: false
+window_title: ^SpaceChem$
+hooks:
+- stop_xcape
+- hide_top_bar

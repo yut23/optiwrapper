@@ -1,0 +1,8 @@
+flags:
+  fallback: true
+  vsync: true
+  is_64_bit: false
+process_name: oriDE.exe
+window_class: oride.exe
+hooks:
+- stop_xcape

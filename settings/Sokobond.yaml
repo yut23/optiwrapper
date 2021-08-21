@@ -1,0 +1,5 @@
+flags:
+  use_gpu: false
+window_class: sokobond.exe
+hooks:
+- stop_xcape

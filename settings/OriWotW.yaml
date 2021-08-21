@@ -1,0 +1,7 @@
+flags:
+  fallback: false
+  vsync: true
+process_name: oriwotw.exe
+window_class: oriwotw.exe
+hooks:
+- stop_xcape

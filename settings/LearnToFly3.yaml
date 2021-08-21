@@ -1,0 +1,4 @@
+flags:
+  use_gpu: false
+window_title: ^Learn to Fly 3$
+window_class: learn to fly 3.exe

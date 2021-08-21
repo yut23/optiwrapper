@@ -1,0 +1,3 @@
+flags:
+  use_gpu: false
+window_title: ^TIS-100$

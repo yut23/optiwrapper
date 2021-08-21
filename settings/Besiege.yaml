@@ -1,0 +1,3 @@
+flags:
+  use_gpu: true
+window_title: ^Besiege$

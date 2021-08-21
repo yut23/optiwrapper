@@ -1,0 +1,14 @@
+command:
+- /usr/bin/osu-wine
+flags:
+  use_gpu: false
+  vsync: false
+window_title: ^osu\!$
+window_class: osu!.exe
+hooks:
+- disable_touchpad
+- hide_top_bar
+- unredirect
+- prime_sync
+- stop_ananicy
+- otd=osu.json

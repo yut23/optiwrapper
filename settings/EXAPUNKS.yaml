@@ -1,0 +1,3 @@
+flags:
+  use_gpu: false
+window_class: EXAPUNKS.bin.x86_64

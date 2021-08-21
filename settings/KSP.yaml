@@ -1,0 +1,5 @@
+flags:
+  vsync: true
+window_title: ^Kerbal Space Program$
+hooks:
+- stop_xcape

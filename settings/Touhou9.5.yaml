@@ -1,0 +1,9 @@
+command:
+- /usr/bin/wine
+- /home/eric/Games/Touhou/thcrap/thcrap_loader.exe
+- en.js
+- th095
+flags:
+  use_gpu: false
+process_name: th095.exe
+window_class: th095.exe

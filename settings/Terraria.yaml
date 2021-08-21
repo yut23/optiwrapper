@@ -1,0 +1,7 @@
+flags:
+  use_gpu: false
+window_title: '^Terraria( 2| Part 3)?:'
+window_class: (Terraria|tModLoader).bin.x86(_64)?|mono-sgen
+hooks:
+- stop_xcape
+- hide_top_bar

@@ -1,0 +1,7 @@
+command:
+- /usr/bin/factorio
+flags:
+  vsync: true
+window_class: factorio
+hooks:
+- stop_xcape

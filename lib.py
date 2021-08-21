@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Testing interaction with the C watch_focus program from inside python.
+Common functions and variables used in multiple modules.
 """
 
 import logging
 import os
 import re
 import sys
+from pathlib import Path
 from typing import Callable, Dict, Generator, Iterable, List, Union
 
 from proc.core import Process, find_processes
@@ -15,6 +16,11 @@ from Xlib import X, display, error
 from libxdo import window_t
 
 logger = logging.getLogger("optiwrapper")
+
+# Paths
+WRAPPER_DIR = Path.home() / "Games/wrapper"
+CONFIG_DIR = WRAPPER_DIR / "old/config"
+SETTINGS_DIR = WRAPPER_DIR / "settings"
 
 # Used to tell focus thread to stop
 running = True
@@ -127,11 +133,11 @@ def pgrep(pattern: str, match_full: bool = False) -> List[Process]:
     return list(procs)
 
 
-def remove_overlay(is_32_bit: bool = False) -> Dict[str, str]:
-    if is_32_bit:
-        bad_lib = "ubuntu12_64"
-    else:
+def remove_overlay(is_64_bit: bool = False) -> Dict[str, str]:
+    if is_64_bit:
         bad_lib = "ubuntu12_32"
+    else:
+        bad_lib = "ubuntu12_64"
     if bad_lib in os.environ.get("LD_PRELOAD", ""):
         return {
             "LD_PRELOAD": ":".join(
