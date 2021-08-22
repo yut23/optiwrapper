@@ -13,7 +13,7 @@ from typing import Callable, Dict, Generator, Iterable, List, Union
 from proc.core import Process, find_processes
 from Xlib import X, display, error
 
-from libxdo import window_t
+from .libxdo import window_t
 
 logger = logging.getLogger("optiwrapper")
 

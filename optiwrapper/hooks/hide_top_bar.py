@@ -1,5 +1,4 @@
-import gnome_shell_ext
-
+from .. import gnome_shell_ext
 from . import WrapperHook
 
 UUID = "hidetopbar@mathieu.bidon.ca"

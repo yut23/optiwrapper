@@ -2,4 +2,4 @@
 import optiwrapper
 
 if __name__ == "__main__":
-    optiwrapper.wrapper.run()
+    optiwrapper.configurator.run()

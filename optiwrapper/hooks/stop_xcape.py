@@ -1,5 +1,4 @@
-from lib import pgrep
-
+from ..lib import pgrep
 from . import WrapperHook
 
 

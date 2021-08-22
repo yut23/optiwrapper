@@ -1,13 +1,14 @@
-# type: ignore
 import sys
+from typing import NoReturn
 
 from PySide2.QtCore import QFile
 from PySide2.QtWidgets import QApplication, QMainWindow
 
-from ui.settingswindow import Ui_SettingsWindow
+from ..settings import Config
+from .ui.settingswindow import Ui_SettingsWindow
 
 
-class MainWindow(QMainWindow):
+class MainWindow(QMainWindow):  # type: ignore
     def __init__(self):
         super(MainWindow, self).__init__()
         self.ui = Ui_SettingsWindow()
@@ -17,10 +18,10 @@ class MainWindow(QMainWindow):
         self.ui.splitter.setStretchFactor(1, 1)
 
 
-if __name__ == "__main__":
+def run() -> NoReturn:
     app = QApplication(sys.argv)
 
-    window = MainWindow()
+    window = MainWindow()  # type: ignore
     window.show()
 
     sys.exit(app.exec_())

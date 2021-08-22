@@ -6,9 +6,9 @@ import subprocess
 from os.path import dirname, join, realpath, split, splitext
 from typing import Any, Dict, Type
 
-from lib import remove_overlay
+from ..lib import remove_overlay
 
-logger = logging.getLogger("optiwrapper." + __name__)
+logger = logging.getLogger(__name__)
 
 
 def run(
@@ -16,33 +16,32 @@ def run(
 ) -> "subprocess.CompletedProcess[Any]":
     """run(args: _CMD, bufsize: int, executable: Optional[AnyPath], stdin: _FILE, stdout: _FILE, stderr: _FILE, preexec_fn: Callable[[], Any], close_fds: bool, shell: bool, cwd: Optional[AnyPath], env: Optional[_ENV], universal_newlines: bool, startupinfo: Any, creationflags: int, restore_signals: bool, start_new_session: bool, pass_fds: Any, *, is_32_bit: bool, capture_output: bool, check: bool, encoding: Optional[str], errors: Optional[str], input: Optional[_TXT], text: Optional[bool], timeout: Optional[float]) -> CompletedProcess[Any]
 
-Run command with arguments and return a CompletedProcess instance.
+    Run command with arguments and return a CompletedProcess instance.
 
-The returned instance will have attributes args, returncode, stdout and
-stderr. By default, stdout and stderr are not captured, and those attributes
-will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them.
+    The returned instance will have attributes args, returncode, stdout and
+    stderr. By default, stdout and stderr are not captured, and those attributes
+    will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them.
 
-If check is True and the exit code was non-zero, it raises a
-CalledProcessError. The CalledProcessError object will have the return code
-in the returncode attribute, and output & stderr attributes if those streams
-were captured.
+    If check is True and the exit code was non-zero, it raises a
+    CalledProcessError. The CalledProcessError object will have the return code
+    in the returncode attribute, and output & stderr attributes if those streams
+    were captured.
 
-If timeout is given, and the process takes too long, a TimeoutExpired
-exception will be raised.
+    If timeout is given, and the process takes too long, a TimeoutExpired
+    exception will be raised.
 
-There is an optional argument "input", allowing you to
-pass bytes or a string to the subprocess's stdin.  If you use this argument
-you may not also use the Popen constructor's "stdin" argument, as
-it will be used internally.
+    There is an optional argument "input", allowing you to
+    pass bytes or a string to the subprocess's stdin.  If you use this argument
+    you may not also use the Popen constructor's "stdin" argument, as
+    it will be used internally.
 
-By default, all communication is in bytes, and therefore any "input" should
-be bytes, and the stdout and stderr will be bytes. If in text mode, any
-"input" should be a string, and stdout and stderr will be strings decoded
-according to locale encoding, or by "encoding" if set. Text mode is
-triggered by setting any of text, encoding, errors or universal_newlines.
+    By default, all communication is in bytes, and therefore any "input" should
+    be bytes, and the stdout and stderr will be bytes. If in text mode, any
+    "input" should be a string, and stdout and stderr will be strings decoded
+    according to locale encoding, or by "encoding" if set. Text mode is
+    triggered by setting any of text, encoding, errors or universal_newlines.
 
-The other arguments are the same as for the Popen constructor.
-"""
+    The other arguments are the same as for the Popen constructor."""
     kwargs = kwargs.copy()
     env_override = remove_overlay(is_32_bit)
     if "env" in kwargs:
@@ -114,5 +113,6 @@ def register_hooks() -> None:
                 _REGISTERED_HOOKS[module] = importlib.import_module(  # type: ignore
                     __name__ + "." + module
                 ).Hook
-            except ImportError:
+            except ImportError as ex:
+                logger.debug("Failed to load %r hook:", module, exc_info=ex)
                 logger.warning("Ignoring exception while loading the %r hook.", module)

@@ -13,7 +13,7 @@ from typing import Any, ClassVar, Dict, List, Literal, Optional, Tuple, TypedDic
 
 import yaml
 
-from lib import CONFIG_DIR, SETTINGS_DIR, logger
+from .lib import CONFIG_DIR, SETTINGS_DIR, logger
 
 
 class ConfigFlags:

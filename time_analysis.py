@@ -10,7 +10,7 @@ import sys
 from enum import Enum
 from typing import List, NamedTuple, Optional
 
-from wrapper import WRAPPER_DIR
+from wrapper.lib import WRAPPER_DIR
 
 EventType = Enum("EventType", "START LEAVE RETURN STOP")
 START = EventType.START
