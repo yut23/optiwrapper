@@ -314,7 +314,7 @@ class FocusThread(threading.Thread):
             self.kwargs["winname"] = main.cfg.window_title
             self.track_focus = True
         if main.cfg.window_class:
-            self.kwargs["winclassname"] = "^" + main.cfg.window_class + "$"
+            self.kwargs["winclassname"] = "^(" + main.cfg.window_class + ")$"
             self.track_focus = True
 
         if not self.in_window_manager:
@@ -607,7 +607,7 @@ class Main:
             logger.debug("subprocess %d done, exiting wrapper", proc.pid)
         else:
             # find process
-            time.sleep(2)
+            # time.sleep(2)
             pattern = self.cfg.process_name
             proc_start_time = time.time()
             procs = pgrep(pattern)
