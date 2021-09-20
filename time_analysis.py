@@ -10,7 +10,7 @@ import sys
 from enum import Enum
 from typing import List, NamedTuple, Optional
 
-from wrapper.lib import WRAPPER_DIR
+from optiwrapper.lib import WRAPPER_DIR
 
 EventType = Enum("EventType", "START LEAVE RETURN STOP")
 START = EventType.START
@@ -23,6 +23,7 @@ STOP = EventType.STOP
 class Event(NamedTuple):
     event: Optional[EventType]
     time: datetime.datetime
+    line_num: int
 
     def __eq__(self, other):
         if isinstance(other, Event):
@@ -65,7 +66,7 @@ EVENT_PAIRS = {
 }
 
 
-def parse(entry: str) -> Event:
+def parse(entry: str, line_num: int) -> Event:
     ACTIONS = {
         "game started": EventType.START,
         "game stopped": EventType.STOP,
@@ -82,7 +83,7 @@ def parse(entry: str) -> Event:
     if dt.startswith("#"):
         event_type = None
         dt = dt[1:]
-    return Event(event_type, datetime.datetime.fromisoformat(dt))
+    return Event(event_type, datetime.datetime.fromisoformat(dt), line_num)
 
 
 def process(events: List[Event], print_invalid: bool = True) -> List[Segment]:
@@ -105,10 +106,11 @@ def process(events: List[Event], print_invalid: bool = True) -> List[Segment]:
         if action is None:
             if print_invalid:
                 print(
-                    "Invalid event combination: {:>6s}, {:6s} at line {:5d}, duration {:11.3f}s".format(
+                    "Invalid event combination: {:>6s}, {:6s} at lines {:5d}/+{:<3s} duration {:11.3f}s".format(
                         curr_evt.event.name,
                         next_evt.event.name,
-                        line_num,
+                        curr_evt.line_num,
+                        str(next_evt.line_num - curr_evt.line_num) + ",",
                         (next_evt.time - curr_evt.time).total_seconds(),
                     )
                 )
@@ -150,7 +152,7 @@ if __name__ == "__main__":
             with open(WRAPPER_DIR / "time" / (sys.argv[1] + ".log"), "r") as f:
                 lines = f.readlines()
 
-    evts = sorted(parse(line) for line in lines)
+    evts = sorted(parse(line, i) for i, line in enumerate(lines, 1))
 
     running_segs = process([e for e in evts if e.event in (START, STOP)], verbose)
     all_segs = process(evts, verbose)
