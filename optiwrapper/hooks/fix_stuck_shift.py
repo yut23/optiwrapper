@@ -6,7 +6,7 @@ from . import WINDOW_MANAGER, WrapperHook, run
 
 
 class Hook(WrapperHook):
-    """Fix shift key in LWJGL games"""
+    """Fix stuck shift key in some games"""
 
     XKB_OPTIONS_SCHEMA = "org.gnome.desktop.input-sources"
     XKB_OPTIONS_KEY = "xkb-options"
