@@ -9,6 +9,7 @@ from typing import Any, Dict, Type
 from ..lib import remove_overlay
 
 logger = logging.getLogger(__name__)
+WINDOW_MANAGER = ""
 
 
 def run(

@@ -298,17 +298,6 @@ class FocusThread(threading.Thread):
             "require_all": True,  # require all conditions to match
         }
 
-        # check if we're in a WM
-        self.in_window_manager = (
-            subprocess.run(
-                ["wmctrl", "-m"],
-                check=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            ).returncode
-            == 0
-        )
-
         self.track_focus = False
         if main.cfg.window_title:
             self.kwargs["winname"] = main.cfg.window_title
@@ -317,6 +306,7 @@ class FocusThread(threading.Thread):
             self.kwargs["winclassname"] = "^(" + main.cfg.window_class + ")$"
             self.track_focus = True
 
+        self.in_window_manager = bool(main.window_manager)
         if not self.in_window_manager:
             logger.debug("not in WM")
 
@@ -501,7 +491,17 @@ class Main:
         # create directory if it doesn't exist
         self.time_logfile.parent.mkdir(parents=True, exist_ok=True)
 
+        # check if we're in a WM
+        wmctrl_proc = subprocess.run(
+            ["wmctrl", "-m"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.window_manager = wmctrl_proc.stdout.splitlines()[0].partition(": ")[2]
+
         # load hooks
+        hooks.WINDOW_MANAGER = self.window_manager
         hooks.register_hooks()
         for hook_name in self.cfg.hooks:
             hooks.load_hook(hook_name)
