@@ -1,0 +1,8 @@
+#command:
+#- /usr/bin/java -jar tametsi.exe
+flags:
+  use_gpu: false
+window_title: ^Tametsi$
+window_class: javaw\.exe
+hooks:
+- stop_xcape
