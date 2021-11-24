@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Wrapper script to run games with Optimus, turn off xcape while focused, log
 playtime, and more.
