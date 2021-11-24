@@ -1,0 +1,11 @@
+flags:
+  use_gpu: false
+window_title: ^OneShot$
+window_class: oneshot
+#hooks:
+#- stop_xcape
+#- stop_ananicy
+#- invert_scroll
+#- prime_sync
+#- otd=
+#- otd_focus=
