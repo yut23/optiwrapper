@@ -37,7 +37,7 @@ class GpuType(enum.Enum):
 
 
 # constants
-WINDOW_WAIT_TIME = 60
+WINDOW_WAIT_TIME = 120
 PROCESS_WAIT_TIME = 20
 
 
@@ -497,7 +497,10 @@ class Main:
             capture_output=True,
             text=True,
         )
-        self.window_manager = wmctrl_proc.stdout.splitlines()[0].partition(": ")[2]
+        try:
+            self.window_manager = wmctrl_proc.stdout.splitlines()[0].partition(": ")[2]
+        except IndexError:
+            self.window_manager = ""
 
         # load hooks
         hooks.WINDOW_MANAGER = self.window_manager
