@@ -186,6 +186,11 @@ Search for windows.
 :see: xdo_search_t
 """
 
+# ============================================================================
+# int test_re(const char *pattern);
+_myxdo.test_re.argtypes = (c_char_p,)
+_myxdo.test_re.restype = c_int
+
 
 def xdo_search_windows(
     xdo: Optional[xdo_t] = None,
@@ -238,15 +243,27 @@ def xdo_search_windows(
     search.searchmask = searchmask
 
     if winname is not None:
+        if r"\d" in winname:
+            raise ValueError(r"Posix EREs don't support \d, use [0-9] instead")
         search.winname = winname.encode("utf-8")
+        if not _myxdo.test_re(search.winname):
+            raise ValueError("Invalid regular expression (see error message above)")
         search.searchmask |= SEARCH_NAME
 
     if winclass is not None:
+        if r"\d" in winclass:
+            raise ValueError(r"Posix EREs don't support \d, use [0-9] instead")
         search.winclass = winclass.encode("utf-8")
+        if not _myxdo.test_re(search.winclass):
+            raise ValueError("Invalid regular expression (see error message above)")
         search.searchmask |= SEARCH_CLASS
 
     if winclassname is not None:
+        if r"\d" in winclassname:
+            raise ValueError(r"Posix EREs don't support \d, use [0-9] instead")
         search.winclassname = winclassname.encode("utf-8")
+        if not _myxdo.test_re(search.winclassname):
+            raise ValueError("Invalid regular expression (see error message above)")
         search.searchmask |= SEARCH_CLASSNAME
 
     if pid is not None:

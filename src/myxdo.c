@@ -432,14 +432,21 @@ static int _xdo_match_window_steam_game(const xdo_t *xdo, Window window,
   }
 } /* int _xdo_match_window_steam_game */
 
+int test_re(const char *pattern) {
+  regex_t re;
+  int ret = compile_re(pattern, &re);
+  regfree(&re);
+  return ret;
+} /* int test_re */
+
 static int compile_re(const char *pattern, regex_t *re) {
   int ret;
   if (pattern == NULL) {
-    regcomp(re, "^$", REG_EXTENDED | REG_ICASE);
+    regcomp(re, "^$", REG_EXTENDED | REG_ICASE | REG_NOSUB);
     return True;
   }
 
-  ret = regcomp(re, pattern, REG_EXTENDED | REG_ICASE);
+  ret = regcomp(re, pattern, REG_EXTENDED | REG_ICASE | REG_NOSUB);
   if (ret != 0) {
     fprintf(stderr, "Failed to compile regex (return code %d): '%s'\n", ret,
             pattern);
