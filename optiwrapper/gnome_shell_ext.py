@@ -3,8 +3,6 @@ Python implementation of gnome-extensions-tool.
 <https://gitlab.gnome.org/fmuellner/gnome-extensions-tool>
 """
 
-from typing import cast
-
 from gi.repository import GLib
 from pydbus import SessionBus
 
@@ -39,6 +37,6 @@ def is_extension_enabled(uuid: str) -> bool:
     """
     try:
         shell = bus.get("org.gnome.Shell")
-        return cast(bool, shell.GetExtensionInfo(uuid).get("state", -1) == 1)
+        return bool(shell.GetExtensionInfo(uuid).get("state", -1) == 1)
     except GLib.GError:
         return False

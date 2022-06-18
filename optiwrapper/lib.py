@@ -146,7 +146,7 @@ def remove_overlay(is_64_bit: bool = False) -> Dict[str, str]:
                 if bad_lib not in lib_
             ),
         }
-    return dict()
+    return {}
 
 
 if __name__ == "__main__":

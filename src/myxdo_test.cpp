@@ -11,12 +11,12 @@ int main() {
   Window *windowlist = NULL;
   unsigned int nwindows;
   xdo_search_t search{
-      .winname = "^osu!$",
       .winclassname = "^osu!.exe$",
+      .winname = "^osu!$",
       .max_depth = -1,
       .only_visible = 1,
-      .searchmask = SEARCH_NAME | SEARCH_CLASSNAME,
       .require = xdo_search::SEARCH_ALL,
+      .searchmask = SEARCH_NAME | SEARCH_CLASSNAME,
   };
   std::set<Window> curr_windows{};
   std::set<Window> prev_windows{};

@@ -256,7 +256,7 @@ def construct_command_line(
     Constructs a full command line and environment dict from a configuration
     """
     cmd_args: List[str] = []
-    environ: Dict[str, str] = dict()
+    environ: Dict[str, str] = {}
     # check if we're running under nvidia-xrun
     if gpu_type is GpuType.NVIDIA:
         if not config.flags.vsync:
@@ -597,6 +597,7 @@ class Main:
             " ".join(k + "=" + v for k, v in self.env_override.items()),
         )
         logger.debug("CWD: %s", Path().absolute())
+        # pylint: disable-next=consider-using-with
         proc = subprocess.Popen(self.command, env={**os.environ, **self.env_override})
         # track focus
         ft = FocusThread(self)

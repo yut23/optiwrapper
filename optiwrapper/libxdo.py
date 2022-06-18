@@ -48,10 +48,9 @@ SEARCH_ALL = 1
 window_t = c_ulong
 
 
-class XdoException(Exception):  # pylint: disable=missing-docstring
-    def __init__(self, code, msg):
-        # type: (int, str) -> None
-        super(XdoException, self).__init__(msg)
+class XdoException(Exception):
+    def __init__(self, code: int, msg: str) -> None:
+        super().__init__(msg)
         self.code = code
 
 

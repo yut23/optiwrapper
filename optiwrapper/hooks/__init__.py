@@ -84,8 +84,8 @@ class WrapperHook:
         """Will be run when the game window loses focus."""
 
 
-_REGISTERED_HOOKS: Dict[str, Type[WrapperHook]] = dict()
-_LOADED_HOOKS: Dict[str, WrapperHook] = dict()
+_REGISTERED_HOOKS: Dict[str, Type[WrapperHook]] = {}
+_LOADED_HOOKS: Dict[str, WrapperHook] = {}
 
 
 def load_hook(name: str) -> None:
@@ -111,7 +111,7 @@ def register_hooks() -> None:
         module = splitext(split(filename)[-1])[0]
         if not module.startswith("_"):
             try:
-                _REGISTERED_HOOKS[module] = importlib.import_module(  # type: ignore
+                _REGISTERED_HOOKS[module] = importlib.import_module(
                     __name__ + "." + module
                 ).Hook
             except ImportError as ex:

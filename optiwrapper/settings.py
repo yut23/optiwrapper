@@ -41,7 +41,7 @@ class ConfigFlags:
         self._is_64_bit = is_64_bit
 
     def asdict(self) -> Dict[str, bool]:
-        d = dict()
+        d = {}
         for name in self._fields:
             val = getattr(self, f"_{name}")
             if val is not None:
@@ -132,7 +132,7 @@ class Config:
             is_64_bit=is_64_bit,
         )
 
-        kwargs: Dict[str, Union[str, List[str], ConfigFlags]] = dict()
+        kwargs: Dict[str, Union[str, List[str], ConfigFlags]] = {}
         if "cmd" in old:
             kwargs["command"] = old["cmd"]
         if "proc_name" in old:
@@ -171,7 +171,7 @@ class Config:
 
     def asdict(self) -> Dict[str, Union[str, List[str], ConfigFlags]]:
         """Returns a dict representing this configuration, excluding default values."""
-        d: Dict[str, Union[str, List[str], ConfigFlags]] = dict()
+        d: Dict[str, Union[str, List[str], ConfigFlags]] = {}
         for fld in dataclasses.fields(self):
             if fld.name == "game":
                 continue
@@ -297,7 +297,7 @@ def parse_config_file(data: str) -> Dict[str, Any]:
     config_p = configparser.ConfigParser()
     config_p.optionxform = str  # type: ignore
     config_p.read_string("[section]\n" + data)
-    config = dict()
+    config = {}
     for opt, val in config_p.items("section"):
         dest, value = parse_option(opt, val)
         config[dest] = value
