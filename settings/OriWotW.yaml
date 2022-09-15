@@ -2,6 +2,6 @@ flags:
   fallback: false
   vsync: true
 process_name: oriwotw.exe
-window_class: oriwotw.exe
+window_class: steam_app_1057090
 hooks:
 - stop_xcape

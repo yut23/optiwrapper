@@ -1,4 +1,4 @@
 flags:
   use_gpu: false
   is_64_bit: false
-window_title: '^Plague Inc: Evolved$'
+window_class: PlagueIncEvolved.x86

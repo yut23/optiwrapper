@@ -1,10 +1,13 @@
 command:
-- /usr/local/bin/osu-lazer
+- /usr/bin/osu-lazer
 flags:
   use_gpu: false
   vsync: false
-window_title: ^osu\!lazer$
+window_title: ^osu\!$
+window_class: osu!
 hooks:
+- disable_touchpad
 - hide_top_bar
 - unredirect
+- prime_sync
 - otd=osu.json
