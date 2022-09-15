@@ -9,7 +9,7 @@ class Hook(WrapperHook):
     """Disable mouse acceleration"""
 
     def __init__(self) -> None:
-        self.original_states = dict()
+        self.original_states = {}
         output = check_output([TOOL, "get"], text=True)
         for line in output.strip().split("\n"):
             device, state = line.strip().split(": acceleration ")

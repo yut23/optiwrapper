@@ -13,7 +13,7 @@ class Hook(WrapperHook):
 
     def __init__(self) -> None:
         self.d = display.Display()
-        self.outputs = list()
+        self.outputs = []
         if not self.d.has_extension("RANDR"):
             return
         root = self.d.screen().root

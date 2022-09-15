@@ -16,7 +16,7 @@ class Hook(WrapperHook):
         self.enabled = "on" in output
         # obtain a shared lock on the lock file, to block the touchpad from
         # turning on when the mouse turns off.
-        self.fd = open(lock_file, "r")
+        self.fd = open(lock_file, "r")  # pylint: disable=consider-using-with
         fcntl.flock(self.fd, fcntl.LOCK_SH)
 
     def on_start(self) -> None:
