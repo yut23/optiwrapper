@@ -34,6 +34,7 @@ class GpuType(enum.Enum):
     # INTEL_NOUVEAU = enum.auto()
     NVIDIA = enum.auto()
     BUMBLEBEE = enum.auto()
+    PRIME = enum.auto()
 
 
 # constants
@@ -125,12 +126,13 @@ class Event(enum.Enum):
 
 def get_gpu_type(needs_gpu: bool) -> GpuType:
     # construct_command_line
+    if os.environ.get("NVIDIA_XRUN") is not None:
+        return GpuType.NVIDIA
     if (
-        os.environ.get("NVIDIA_XRUN") is not None
-        or os.readlink("/etc/X11/xorg.conf.d/20-dgpu.conf")
+        os.readlink("/etc/X11/xorg.conf.d/20-dgpu.conf")
         == "/etc/X11/video/20-nvidia.conf"
     ):
-        return GpuType.NVIDIA
+        return GpuType.PRIME
 
     # from main
     if needs_gpu:
@@ -249,18 +251,32 @@ def construct_command_line(
     """
     cmd_args: List[str] = []
     environ: Dict[str, str] = {}
-    # check if we're running under nvidia-xrun
-    if gpu_type is GpuType.NVIDIA:
-        if not config.flags.vsync:
+    if not config.flags.vsync:
+        if gpu_type is GpuType.NVIDIA or (
+            gpu_type is GpuType.PRIME and config.flags.use_gpu
+        ):
             environ["__GL_SYNC_TO_VBLANK"] = "0"
-    elif not config.flags.vsync:
-        environ["vblank_mode"] = "0"
-    elif config.flags.use_gpu:
-        cmd_args.append("optirun")
-        if logger.isEnabledFor(logging.DEBUG):
-            cmd_args.append("--debug")
-        if config.flags.use_primus:
-            cmd_args.extend("-b primus".split())
+        else:
+            environ["vblank_mode"] = "0"
+    if config.flags.use_gpu:
+        vk_icd_filenames = ["nvidia_icd.json"]
+        if gpu_type is GpuType.PRIME:
+            cmd_args.append("prime-run")
+        elif gpu_type is GpuType.BUMBLEBEE:
+            cmd_args.append("optirun")
+            if logger.isEnabledFor(logging.DEBUG):
+                cmd_args.append("--debug")
+            if config.flags.use_primus:
+                cmd_args.extend("-b primus".split())
+    else:
+        vk_icd_filenames = [
+            "radeon_icd.{}.json".format("x86_64" if config.flags.is_64_bit else "i686"),
+            # "intel_icd.x86_64.json",
+            # "intel_hasvk_icd.x86_64.json",
+        ]
+    environ["VK_ICD_FILENAMES"] = ":".join(
+        "/usr/share/vulkan/icd.d/" + filename for filename in vk_icd_filenames
+    )
     if config.command:
         cmd_args.extend(config.command)
     return cmd_args, environ
@@ -459,6 +475,7 @@ class Main:
         if self.cfg.flags.use_gpu and gpu_type not in (
             GpuType.NVIDIA,
             GpuType.BUMBLEBEE,
+            GpuType.PRIME,
         ):
             if self.cfg.flags.fallback:
                 notify(
