@@ -1,0 +1,3 @@
+flags:
+  use_gpu: false
+window_class: Patrick's Parabox.x86_64

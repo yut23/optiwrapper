@@ -1,0 +1,4 @@
+flags:
+  use_gpu: true
+#window_title: ^Hollow Knight$
+window_class: hollow_knight.x86_64

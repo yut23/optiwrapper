@@ -1,0 +1,3 @@
+flags:
+  use_gpu: false
+window_class: LastCallBBS.bin.x86_64
