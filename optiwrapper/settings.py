@@ -2,18 +2,15 @@
 Manages loading and storing per-game configuration data.
 """
 
-import configparser
 import dataclasses
 import itertools
 import os
-import shlex
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Literal, Optional, Tuple, TypedDict, Union
+from typing import Any, ClassVar, Dict, List, Optional, Union
 
 import yaml
 
-from .lib import CONFIG_DIR, SETTINGS_DIR, logger
+from .lib import SETTINGS_DIR
 
 
 class ConfigFlags:
@@ -103,53 +100,12 @@ class Config:
     @classmethod
     def load(cls, game: str) -> "Config":
         path = SETTINGS_DIR / f"{game}.yaml"
-        if not path.exists() and (CONFIG_DIR / f"{game}.cfg").exists():
-            # try old config
-            logger.warning("Loading from old config file")
-            return cls.load_legacy(game)
         with open(path) as f:
             data = yaml.safe_load(f)
 
         if "flags" in data:
             data["flags"] = ConfigFlags(**data["flags"])
         return cls(game, **data)
-
-    @classmethod
-    def load_legacy(cls, game: str) -> "Config":
-        path = CONFIG_DIR / f"{game}.cfg"
-        with open(path) as f:
-            config_data = f.read()
-        old = parse_config_file(config_data)
-
-        is_64_bit: Optional[bool] = None
-        if "is_32_bit" in old:
-            is_64_bit = not old["is_32_bit"]
-        flags = ConfigFlags(
-            use_gpu=old.get("use_gpu", None),
-            fallback=old.get("fallback", None),
-            use_primus=old.get("use_primus", None),
-            vsync=old.get("force_vsync", None),
-            is_64_bit=is_64_bit,
-        )
-
-        kwargs: Dict[str, Union[str, List[str], ConfigFlags]] = {}
-        if "cmd" in old:
-            kwargs["command"] = old["cmd"]
-        if "proc_name" in old:
-            kwargs["process_name"] = old["proc_name"]
-        if "window_title" in old:
-            kwargs["window_title"] = old["window_title"]
-        if "window_class" in old:
-            kwargs["window_class"] = old["window_class"]
-        if flags:
-            kwargs["flags"] = flags
-        if "hooks" in old:
-            kwargs["hooks"] = old["hooks"]
-
-        config = cls(game, **kwargs)  # type: ignore
-        # save to the new format
-        config.save()
-        return config
 
     def check(self) -> Optional[str]:
         """Checks if this configuration is valid.
@@ -220,86 +176,3 @@ class Config:
             else:
                 out.append(fmt(fld.name, val))
         return "\n".join(out)
-
-
-### OLD CONFIG HANDLING BELOW ###
-
-
-class ConfigDict(TypedDict, total=False):
-    cmd: List[str]
-    game: str
-    use_gpu: bool
-    fallback: bool
-    use_primus: bool
-    force_vsync: bool
-    is_32_bit: bool
-    proc_name: str
-    window_title: str
-    window_class: str
-    hooks: List[str]
-
-
-ConfigKeys = Literal[
-    "cmd",
-    "game",
-    "use_gpu",
-    "fallback",
-    "use_primus",
-    "force_vsync",
-    "is_32_bit",
-    "proc_name",
-    "window_title",
-    "window_class",
-    "hooks",
-]
-
-
-CONFIG_TYPES = ConfigDict.__annotations__  # pylint: disable=no-member
-
-
-class ConfigException(Exception):
-    """
-    An error caused by an invalid configuration file.
-    """
-
-
-def parse_config_file(data: str) -> Dict[str, Any]:
-    """
-    Parses the contents of a configuration file.
-    """
-
-    def parse_option(option: str, value: Any) -> Tuple[str, Any]:
-        if option.lower() not in CONFIG_TYPES:
-            raise ConfigException("Invalid option: {}".format(option))
-        dest = option.lower()
-        type_ = CONFIG_TYPES[dest]
-
-        if type_ is str:
-            vals = shlex.split(value)
-            if len(vals) == 1:
-                # strip quotes if there's only one string
-                return dest, vals[0]
-            return dest, value
-        if type_ is List[str]:
-            if not (value and value[0] == "(" and value[-1] == ")"):
-                raise ConfigException(
-                    "{} must be an array, surrounded by parens".format(option)
-                )
-            return dest, shlex.split(value[1:-1])
-        if type_ is bool:
-            if value not in ("y", "n"):
-                raise ConfigException('{} must be "y" or "n"'.format(option))
-            return dest, value == "y"
-        if type_ is Path:
-            return dest, Path(value).expanduser().absolute()
-        raise ConfigException("Internal error: argument type not found for " + option)
-
-    config_p = configparser.ConfigParser()
-    config_p.optionxform = str  # type: ignore
-    config_p.read_string("[section]\n" + data)
-    config = {}
-    for opt, val in config_p.items("section"):
-        dest, value = parse_option(opt, val)
-        config[dest] = value
-
-    return config

@@ -22,7 +22,7 @@ import notify2
 from notify2 import dbus
 
 from . import hooks, lib
-from .lib import CONFIG_DIR, WRAPPER_DIR, logger, pgrep, watch_focus
+from .lib import SETTINGS_DIR, WRAPPER_DIR, logger, pgrep, watch_focus
 from .libxdo import xdo_free, xdo_new, xdo_search_windows
 from .settings import Config
 
@@ -218,7 +218,7 @@ def get_config(
         logger.error(
             'The configuration file for "%s" was not found in %s.',
             args.game,
-            CONFIG_DIR,
+            SETTINGS_DIR,
         )
         sys.exit(1)
 
@@ -227,24 +227,16 @@ def get_config(
     # check arguments
     if args.command:
         # print('cli command:', args.command)
-        if not config.command:
-            config.command = args.command
-        else:
-            if config.command[0] != args.command[0]:
-                logger.warning(
-                    "Different command given in config file and command line"
-                )
-            config.command = args.command
+        if config.command and config.command[0] != args.command[0]:
+            logger.warning("Different command given in config file and command line")
+        config.command = args.command
 
     if args.use_gpu is not None:
         config.flags.use_gpu = args.use_gpu
 
     if args.hide_top_bar is not None:
-        if config.hooks:
-            if "hide_top_bar" not in config.hooks:
-                config.hooks.append("hide_top_bar")
-        else:
-            config.hooks = ["hide_top_bar"]
+        if "hide_top_bar" not in config.hooks:
+            config.hooks.append("hide_top_bar")
 
     return config
 

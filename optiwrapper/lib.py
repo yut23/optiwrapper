@@ -19,7 +19,6 @@ logger = logging.getLogger("optiwrapper")
 
 # Paths
 WRAPPER_DIR = Path.home() / "Games/wrapper"
-CONFIG_DIR = WRAPPER_DIR / "old/config"
 SETTINGS_DIR = WRAPPER_DIR / "settings"
 
 # Used to tell focus thread to stop
