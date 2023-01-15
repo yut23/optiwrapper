@@ -1,3 +1,1 @@
-flags:
-  use_gpu: false
 window_class: Lightning.bin.x86_64

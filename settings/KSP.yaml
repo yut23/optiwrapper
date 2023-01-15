@@ -1,4 +1,5 @@
 flags:
+  use_gpu: true
   vsync: true
 window_title: ^Kerbal Space Program$
 hooks:

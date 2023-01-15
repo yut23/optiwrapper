@@ -55,7 +55,7 @@ class ConfigFlags:
     @property
     def use_gpu(self) -> bool:
         if self._use_gpu is None:
-            return True
+            return False
         return self._use_gpu
 
     @use_gpu.setter

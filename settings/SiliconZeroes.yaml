@@ -1,5 +1,3 @@
-flags:
-  use_gpu: false
 window_title: ^Silicon Zeroes$
 window_class: rawexec
 #hooks:

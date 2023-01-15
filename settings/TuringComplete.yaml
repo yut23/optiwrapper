@@ -1,5 +1,3 @@
-flags:
-  use_gpu: false
 window_title: ^Turing Complete$
 window_class: Godot_Engine
 hooks:

@@ -4,7 +4,7 @@
 #- second argument
 
 #flags:
-#  use_gpu: true
+#  use_gpu: false
 #  fallback: true
 #  use_primus: true
 #  vsync: true

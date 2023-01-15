@@ -1,5 +1,4 @@
 flags:
-  use_gpu: false
   vsync: true
 window_class: limbo
 hooks:

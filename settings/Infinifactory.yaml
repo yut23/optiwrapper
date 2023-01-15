@@ -1,3 +1,5 @@
+flags:
+  use_gpu: true
 window_title: ^Infinifactory$
 hooks:
 - stop_xcape

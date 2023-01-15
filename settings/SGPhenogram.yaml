@@ -4,6 +4,5 @@ command:
 - /home/eric/.local/share/Steam/steamapps/common/SG_Phenogram/Game.exe
 - mages_sgate
 flags:
-  use_gpu: false
   vsync: true
 window_title: ^SG Linear Bounded Phenogram$

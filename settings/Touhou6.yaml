@@ -3,7 +3,5 @@ command:
 - /home/eric/Games/Touhou/thcrap/thcrap_loader.exe
 - th06-retex.js
 - th06
-flags:
-  use_gpu: false
 process_name: 東方紅魔郷.exe
 window_class: 東方紅魔郷.exe

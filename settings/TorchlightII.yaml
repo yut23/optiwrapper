@@ -1,4 +1,5 @@
 flags:
+  use_gpu: true
   vsync: true
 window_class: Torchlight2.bin.x86_64
 hooks:

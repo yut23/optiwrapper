@@ -1,6 +1,7 @@
 command:
 - /usr/bin/factorio
 flags:
+  use_gpu: true
   vsync: true
 window_class: factorio
 hooks:

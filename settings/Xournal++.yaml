@@ -1,7 +1,5 @@
 command:
 - /usr/bin/xournalpp
-flags:
-  use_gpu: false
 window_class: xournalpp
 hooks:
 - otd_focus=xournalpp.json

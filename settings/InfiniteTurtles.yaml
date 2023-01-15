@@ -1,5 +1,3 @@
-flags:
-  use_gpu: false
 window_class: InfiniteTurtles
 hooks:
 - stop_xcape

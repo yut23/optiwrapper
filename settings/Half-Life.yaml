@@ -1,3 +1,4 @@
 flags:
+  use_gpu: true
   vsync: true
 window_title: Half-Life

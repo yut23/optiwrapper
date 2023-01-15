@@ -1,4 +1,3 @@
 flags:
-  use_gpu: false
   is_64_bit: false
 window_class: Braid.bin.x86

@@ -1,5 +1,3 @@
-flags:
-  use_gpu: false
 window_title: ^SpaceChem$
 hooks:
 - stop_xcape

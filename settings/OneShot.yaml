@@ -1,5 +1,3 @@
-flags:
-  use_gpu: false
 window_title: ^OneShot$
 window_class: oneshot
 #hooks:

@@ -1,7 +1,6 @@
 command:
 - /usr/bin/osu-lazer
 flags:
-  use_gpu: false
   vsync: false
 window_title: ^osu\!$
 window_class: osu!

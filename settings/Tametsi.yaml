@@ -2,8 +2,6 @@ command:
 - /usr/bin/java
 - -jar
 - tametsi.jar
-flags:
-  use_gpu: false
 window_title: ^Tametsi$
 window_class: javaw\.exe|sun-awt-X11-XFramePeer
 hooks:

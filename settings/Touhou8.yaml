@@ -3,7 +3,5 @@ command:
 - /home/eric/Games/Touhou/thcrap/thcrap_loader.exe
 - en.js
 - th08
-flags:
-  use_gpu: false
 process_name: th08.exe
 window_class: th08.exe

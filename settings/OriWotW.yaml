@@ -1,4 +1,5 @@
 flags:
+  use_gpu: true
   fallback: false
   vsync: true
 process_name: oriwotw.exe

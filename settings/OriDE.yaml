@@ -1,4 +1,5 @@
 flags:
+  use_gpu: true
   fallback: true
   vsync: true
   is_64_bit: false
