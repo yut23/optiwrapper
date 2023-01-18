@@ -3,7 +3,7 @@ import importlib
 import logging
 import os
 import subprocess
-from os.path import dirname, join, realpath, split, splitext
+from pathlib import Path
 from typing import Any, Dict, Type
 
 from ..lib import remove_overlay
@@ -15,6 +15,7 @@ WINDOW_MANAGER = ""
 def run(
     *args: Any, is_32_bit: bool = False, **kwargs: Any
 ) -> "subprocess.CompletedProcess[Any]":
+    # pylint: disable-next=line-too-long
     """run(args: _CMD, bufsize: int, executable: Optional[AnyPath], stdin: _FILE, stdout: _FILE, stderr: _FILE, preexec_fn: Callable[[], Any], close_fds: bool, shell: bool, cwd: Optional[AnyPath], env: Optional[_ENV], universal_newlines: bool, startupinfo: Any, creationflags: int, restore_signals: bool, start_new_session: bool, pass_fds: Any, *, is_32_bit: bool, capture_output: bool, check: bool, encoding: Optional[str], errors: Optional[str], input: Optional[_TXT], text: Optional[bool], timeout: Optional[float]) -> CompletedProcess[Any]
 
     Run command with arguments and return a CompletedProcess instance.
@@ -105,15 +106,16 @@ def get_hooks() -> Dict[str, WrapperHook]:
 
 
 def register_hooks() -> None:
-    basedir = dirname(realpath(__file__))
+    basedir = Path(__file__).resolve().parent
 
-    for filename in glob.glob(join(basedir, "*.py")):
-        module = splitext(split(filename)[-1])[0]
-        if not module.startswith("_"):
-            try:
-                _REGISTERED_HOOKS[module] = importlib.import_module(
-                    __name__ + "." + module
-                ).Hook
-            except ImportError as ex:
-                logger.debug("Failed to load %r hook:", module, exc_info=ex)
-                logger.warning("Ignoring exception while loading the %r hook.", module)
+    for path in basedir.glob("*.py"):
+        module = path.stem
+        if module.startswith("_") or module == "template":
+            continue
+        try:
+            _REGISTERED_HOOKS[module] = importlib.import_module(
+                f"{__name__}.{module}"
+            ).Hook
+        except ImportError as ex:
+            logger.debug("Failed to load %r hook:", module, exc_info=ex)
+            logger.warning("Ignoring exception while loading the %r hook.", module)
