@@ -14,77 +14,66 @@ from .lib import SETTINGS_DIR
 
 
 class ConfigFlags:
-    _fields: ClassVar[List[str]] = [
-        "use_gpu",
-        "fallback",
-        "use_primus",
-        "vsync",
-        "is_64_bit",
-    ]
+    _defaults: ClassVar[Dict[str, bool]] = dict(
+        use_gpu=False,
+        fallback=True,
+        use_primus=True,
+        vsync=True,
+        is_64_bit=True,
+    )
 
-    def __init__(
-        self,
-        use_gpu: Optional[bool] = None,
-        fallback: Optional[bool] = None,
-        use_primus: Optional[bool] = None,
-        vsync: Optional[bool] = None,
-        is_64_bit: Optional[bool] = None,
-    ):
+    def __init__(self, **kwargs: bool):
         # pylint: disable=too-many-arguments
-        self._use_gpu = use_gpu
-        self._fallback = fallback
-        self._use_primus = use_primus
-        self._vsync = vsync
-        self._is_64_bit = is_64_bit
+        self._lookup: Dict[str, bool] = {}
+        for key in self._defaults:
+            if key in kwargs:
+                self._lookup[key] = kwargs.pop(key)
+        if kwargs:
+            raise TypeError(
+                "ConfigFlags.__init__() got an unexpected keyword argument {!r}".format(
+                    next(iter(kwargs))
+                )
+            )
 
     def asdict(self) -> Dict[str, bool]:
-        d = {}
-        for name in self._fields:
-            val = getattr(self, f"_{name}")
-            if val is not None:
-                d[name] = val
-        return d
+        return self._lookup
 
     def __bool__(self) -> bool:
-        return bool(self.asdict())
+        return bool(self._lookup)
 
     @property
     def fields(self) -> List[str]:
-        return self._fields
+        return list(self._defaults.keys())
 
-    @property
-    def use_gpu(self) -> bool:
-        if self._use_gpu is None:
-            return False
-        return self._use_gpu
+    def __getattr__(self, name: str) -> Any:
+        # this only gets called if `name` isn't an existing instance attribute
+        return self._lookup.get(name, self._defaults[name])
 
-    @use_gpu.setter
-    def use_gpu(self, value: bool) -> None:
-        self._use_gpu = value
+    def __setattr__(self, name: str, value: bool) -> None:
+        if name in self._defaults:
+            self._lookup[name] = value
+        else:
+            super().__setattr__(name, value)
 
-    @property
-    def fallback(self) -> bool:
-        if self._fallback is None:
-            return True
-        return self._fallback
+    def __delattr__(self, name: str) -> None:
+        if name in self._defaults:
+            del self._lookup[name]
+        else:
+            super().__delattr__(name)
 
-    @property
-    def use_primus(self) -> bool:
-        if self._use_primus is None:
-            return True
-        return self._use_primus
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, ConfigFlags):
+            return NotImplemented
+        return self._lookup == other._lookup
 
-    @property
-    def vsync(self) -> bool:
-        if self._vsync is None:
-            return True
-        return self._vsync
-
-    @property
-    def is_64_bit(self) -> bool:
-        if self._is_64_bit is None:
-            return True
-        return self._is_64_bit
+    def __repr__(self) -> str:
+        return (
+            "ConfigFlags("
+            + ",".join(
+                f"{k}={self._lookup[k]}" for k in self._defaults if k in self._lookup
+            )
+            + ")"
+        )
 
 
 @dataclass
