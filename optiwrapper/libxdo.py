@@ -190,6 +190,41 @@ Search for windows.
 _myxdo.test_re.argtypes = (c_char_p,)
 _myxdo.test_re.restype = c_int
 
+# ============================================================================
+# int xprop_select_window_with_click(const xdo_t *xdo, Window *window_ret);
+_myxdo.xdo_select_window_with_click.argtypes = (
+    POINTER(xdo_t),
+    POINTER(window_t),
+)
+_myxdo.xdo_select_window_with_click.restype = c_int
+_myxdo.xdo_select_window_with_click.errcheck = _errcheck_cb  # type: ignore
+_myxdo.xdo_select_window_with_click.__doc__ = """\
+Get a window ID by clicking on it. This function blocks until a selection
+is made.
+
+:param window_ret: the selected window.
+"""
+
+
+def xdo_select_window_with_click(xdo: Optional[xdo_t] = None) -> Optional[int]:
+    """
+    Get a window ID by clicking on it. This function blocks until a selection is made.
+    The selection can be canceled by right-clicking.
+
+    Returns None if the selection was canceled or an error occurred.
+    """
+    window_ret = window_t(0)
+
+    make_xdo = xdo is None
+    if make_xdo:
+        xdo = xdo_new(None)
+    return_code = _myxdo.xdo_select_window_with_click(xdo, byref(window_ret))
+    if make_xdo:
+        xdo_free(xdo)
+    if return_code == XDO_ERROR or window_ret.value == 0:
+        return None
+    return window_ret.value
+
 
 def xdo_search_windows(
     xdo: Optional[xdo_t] = None,
@@ -234,7 +269,8 @@ def xdo_search_windows(
     :return:
         A list of window ids matching query.
     """
-    # pylint: disable=attribute-defined-outside-init, too-many-arguments, too-many-locals
+    # pylint: disable=attribute-defined-outside-init, too-many-arguments
+    # pylint: disable=too-many-locals, too-many-branches, too-many-statements
     windowlist_ret = pointer(window_t(0))
     nwindows_ret = c_uint(0)
 

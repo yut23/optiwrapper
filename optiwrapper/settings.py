@@ -75,6 +75,9 @@ class ConfigFlags:
             + ")"
         )
 
+    def copy(self) -> "ConfigFlags":
+        return ConfigFlags(**self._lookup)
+
 
 @dataclass
 class Config:
@@ -138,6 +141,17 @@ class Config:
                 allow_unicode=True,
                 sort_keys=False,
             )
+
+    def copy(self) -> "Config":
+        return Config(
+            self.game,
+            self.command.copy(),
+            self.flags.copy(),
+            self.process_name,
+            self.window_title,
+            self.window_class,
+            self.hooks.copy(),
+        )
 
     def pretty(self) -> str:
         """Pretty-formats this Config object."""

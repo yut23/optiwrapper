@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Optiwrapper Configurator
+Path=/home/eric/Games/wrapper
+Exec=/home/eric/Games/wrapper/configurator.py
+Terminal=true
+Categories=Settings

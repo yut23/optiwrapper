@@ -6,12 +6,12 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>519</height>
+    <width>750</width>
+    <height>700</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Optiwrapper Configurator</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayout">
@@ -29,30 +29,50 @@
       <widget class="QWidget" name="layoutWidget">
        <layout class="QVBoxLayout" name="game_container">
         <item>
-         <widget class="QListWidget" name="game_picker">
-          <property name="viewMode">
-           <enum>QListView::IconMode</enum>
+         <widget class="QListView" name="game_picker">
+          <property name="selectionMode">
+           <enum>QAbstractItemView::SingleSelection</enum>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="add_game_button">
-          <property name="text">
-           <string>Add Game</string>
-          </property>
-         </widget>
+         <layout class="QHBoxLayout" name="add_game_container">
+          <item>
+           <widget class="QLineEdit" name="game_id_textbox">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;New game ID to add&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="statusTip">
+             <string>New game ID to add</string>
+            </property>
+            <property name="placeholderText">
+             <string>Game ID</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="add_game_button">
+            <property name="text">
+             <string>Add Game</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="layoutWidget_2">
-       <layout class="QVBoxLayout" name="settings_container" stretch="0,1">
+      <widget class="QGroupBox" name="settings_container">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="title">
+        <string/>
+       </property>
+       <layout class="QVBoxLayout" name="verticalLayout" stretch="0,1,0">
         <item>
          <layout class="QFormLayout" name="top_form_layout">
           <item row="0" column="0">
            <widget class="QLabel" name="command_label">
-            <property name="toolTip">
-             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The command to run, potentially with arguments.&lt;/p&gt;&lt;p&gt;If specified, any arguments passed on the command line will be ignored.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-            </property>
             <property name="text">
              <string>Command</string>
             </property>
@@ -65,6 +85,9 @@
            <widget class="QLineEdit" name="command_textbox">
             <property name="toolTip">
              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The command to run, potentially with arguments.&lt;/p&gt;&lt;p&gt;If specified, any arguments passed on the command line will be ignored.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="statusTip">
+             <string>The command to run, potentially with arguments.</string>
             </property>
             <property name="inputMethodHints">
              <set>Qt::ImhNoAutoUppercase</set>
@@ -83,6 +106,12 @@
           </item>
           <item row="1" column="1">
            <widget class="QLineEdit" name="process_name_textbox">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The process name, for tracking when the game has exited.&lt;/p&gt;&lt;p&gt;Only needed if the initial process isn't the same as the actual game and it exits early (e.g. a launcher).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="statusTip">
+             <string>The process name, for tracking when the game has exited.</string>
+            </property>
             <property name="inputMethodHints">
              <set>Qt::ImhNoAutoUppercase</set>
             </property>
@@ -100,6 +129,12 @@
           </item>
           <item row="2" column="1">
            <widget class="QLineEdit" name="window_title_textbox">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Name of main game window (regular expression).&lt;/p&gt;&lt;p&gt;Can be found in the Alt-Tab menu or with &lt;code&gt;xprop WM_NAME.&lt;/code&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="statusTip">
+             <string>Name of main game window (regular expression).</string>
+            </property>
             <property name="inputMethodHints">
              <set>Qt::ImhNoAutoUppercase</set>
             </property>
@@ -107,9 +142,6 @@
           </item>
           <item row="3" column="0">
            <widget class="QLabel" name="window_class_label">
-            <property name="toolTip">
-             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Window classname of main game window (must match exactly)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-            </property>
             <property name="text">
              <string>Window class</string>
             </property>
@@ -121,7 +153,10 @@
           <item row="3" column="1">
            <widget class="QLineEdit" name="window_class_textbox">
             <property name="toolTip">
-             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Window classname of main game window (must match exactly)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Window classname of main game window (regex, must match exactly).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="statusTip">
+             <string>Window classname of main game window (regex, must match exactly).</string>
             </property>
             <property name="inputMethodHints">
              <set>Qt::ImhNoAutoUppercase</set>
@@ -130,6 +165,12 @@
           </item>
           <item row="4" column="1">
            <widget class="QPushButton" name="fill_button">
+            <property name="toolTip">
+             <string>Left-click to select a window, right-click to cancel.</string>
+            </property>
+            <property name="statusTip">
+             <string>Left-click to select a window, right-click to cancel.</string>
+            </property>
             <property name="text">
              <string>Fill from window</string>
             </property>
@@ -140,22 +181,22 @@
         <item>
          <layout class="QHBoxLayout" name="bottom_container">
           <item>
-           <layout class="QVBoxLayout" name="toggles_container">
+           <layout class="QVBoxLayout" name="flags_container">
             <property name="spacing">
              <number>0</number>
             </property>
             <item>
-             <widget class="QLabel" name="toggles_label">
+             <widget class="QLabel" name="flags_label">
               <property name="text">
                <string>Toggles</string>
               </property>
               <property name="buddy">
-               <cstring>toggles_list</cstring>
+               <cstring>flags_list</cstring>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QListWidget" name="toggles_list"/>
+             <widget class="QListWidget" name="flags_list"/>
             </item>
            </layout>
           </item>
@@ -181,24 +222,86 @@
           </item>
          </layout>
         </item>
+        <item>
+         <widget class="QPushButton" name="save_button">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Save settings to file&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="statusTip">
+           <string>Save settings to file</string>
+          </property>
+          <property name="text">
+           <string>Save</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
      </widget>
     </item>
    </layout>
   </widget>
+  <widget class="QStatusBar" name="statusBar"/>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>750</width>
+     <height>25</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu_file">
+    <property name="title">
+     <string>&amp;File</string>
+    </property>
+    <addaction name="action_reload"/>
+    <addaction name="separator"/>
+    <addaction name="action_exit"/>
+   </widget>
+   <addaction name="menu_file"/>
+  </widget>
+  <action name="action_reload">
+   <property name="text">
+    <string>&amp;Reload current file</string>
+   </property>
+  </action>
+  <action name="action_exit">
+   <property name="text">
+    <string>E&amp;xit</string>
+   </property>
+  </action>
  </widget>
  <tabstops>
   <tabstop>game_picker</tabstop>
+  <tabstop>game_id_textbox</tabstop>
   <tabstop>add_game_button</tabstop>
   <tabstop>command_textbox</tabstop>
   <tabstop>process_name_textbox</tabstop>
   <tabstop>window_title_textbox</tabstop>
   <tabstop>window_class_textbox</tabstop>
   <tabstop>fill_button</tabstop>
-  <tabstop>toggles_list</tabstop>
+  <tabstop>flags_list</tabstop>
   <tabstop>hooks_list</tabstop>
+  <tabstop>save_button</tabstop>
  </tabstops>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>game_id_textbox</sender>
+   <signal>returnPressed()</signal>
+   <receiver>add_game_button</receiver>
+   <slot>click()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>81</x>
+     <y>649</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>197</x>
+     <y>649</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

@@ -101,8 +101,12 @@ def load_hook(name: str) -> None:
     logger.debug("loaded hook %r", name)
 
 
-def get_hooks() -> Dict[str, WrapperHook]:
+def get_loaded_hooks() -> Dict[str, WrapperHook]:
     return _LOADED_HOOKS
+
+
+def get_all_hooks() -> Dict[str, Type[WrapperHook]]:
+    return _REGISTERED_HOOKS
 
 
 def register_hooks() -> None:

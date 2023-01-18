@@ -173,4 +173,12 @@ int xdo_get_desktop_for_window(const xdo_t *xdo, Window wid, long *desktop);
  */
 int xdo_search_windows(const xdo_t *xdo, const xdo_search_t *search,
                        Window **windowlist_ret, unsigned int *nwindows_ret);
+
+/**
+ * Get a window ID by clicking on it. This function blocks until a selection
+ * is made.
+ *
+ * @param window_ret Pointer to Window where the selected window is stored.
+ */
+int xdo_select_window_with_click(const xdo_t *xdo, Window *window_ret);
 #endif /* ifndef _MYXDO_H_ */
