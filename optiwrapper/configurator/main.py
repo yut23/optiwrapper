@@ -1,5 +1,6 @@
 import bisect
 import logging
+import re
 import shlex
 import sys
 from dataclasses import dataclass
@@ -106,7 +107,7 @@ class ConfigModel(QAbstractListModel):
     def save(self, index: QModelIndex) -> None:
         entry = self._entries[index.row()]
         logger.info("saving:\n%s", entry.config.pretty())
-        entry.config.save()
+        entry.save()
         # changed dirty flag, so we need to update the display text
         self.dataChanged.emit(index, index)
 
@@ -377,7 +378,7 @@ class MainWindow(QMainWindow):
         # python-xlib has get_wm_name() and get_wm_class(), but they only work
         # with ASCII encoded strings (STRING). Some programs put UTF-8 strings
         # in those properties, so we use AnyPropertyType (the default) instead.
-        window_title = win.get_full_text_property(Xatom.WM_NAME)
+        window_title = "^" + re.escape(win.get_full_text_property(Xatom.WM_NAME)) + "$"
         # Some programs (e.g. Touhou 6 under wine) put UTF-8 labeled as latin1
         # in WM_CLASS, so try decoding it as UTF-8 first.
         prop = win.get_full_property(Xatom.WM_CLASS, X.AnyPropertyType)
@@ -392,7 +393,7 @@ class MainWindow(QMainWindow):
             if len(parts) < 2:
                 window_class = ""
             else:
-                window_class = parts[0]
+                window_class = re.escape(parts[0])
         disp.close()
         del win, disp
         logger.debug("setting window title to %s", window_title)

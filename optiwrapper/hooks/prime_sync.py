@@ -18,7 +18,7 @@ class Hook(WrapperHook):
             return
         root = self.d.screen().root
         resources = root.xrandr_get_screen_resources()
-        atom = self.d.intern_atom(prop_name)
+        atom = self.d.get_atom(prop_name)
         for output in resources.outputs:
             value = self.d.xrandr_get_output_property(
                 output, atom, X.AnyPropertyType, 0, 1
