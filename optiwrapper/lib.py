@@ -12,6 +12,7 @@ from typing import Callable, Dict, Generator, Iterable, List, Union
 
 from proc.core import Process, find_processes
 from Xlib import X, display, error
+from Xlib.protocol import event
 
 logger = logging.getLogger("optiwrapper")
 
@@ -25,8 +26,8 @@ running = True
 
 def watch_focus(
     window_ids: Iterable[int],
-    focus_in_cb: Callable[[display.event.FocusIn], None],
-    focus_out_cb: Callable[[display.event.FocusOut], None],
+    focus_in_cb: Callable[[Union[event.FocusIn, None]], None],
+    focus_out_cb: Callable[[Union[event.FocusOut, None]], None],
 ) -> Generator[int, None, None]:
     """Watches for focus changes and executes callbacks.
 
@@ -74,14 +75,14 @@ def watch_focus(
         if evt.type == X.DestroyNotify:
             logger.debug("window destroyed: 0x%x", evt.window.id)
             yield int(evt.window.id)
-        if isinstance(evt, display.event.Focus):
+        if isinstance(evt, event.Focus):
             if evt.mode not in (X.NotifyNormal, X.NotifyWhileGrabbed):
                 continue
-            if evt.type == X.FocusIn and focused != evt.window:
+            if isinstance(evt, event.FocusIn) and focused != evt.window:
                 focus_in_cb(evt)
                 focused = evt.window
             if (
-                evt.type == X.FocusOut
+                isinstance(evt, event.FocusOut)
                 and focused == evt.window
                 and evt.detail != X.NotifyInferior
             ):
@@ -162,8 +163,10 @@ if __name__ == "__main__":
         X.NotifyDetailNone: "NotifyDetailNone",
     }
 
-    def focus_in(evt: display.event.FocusIn) -> None:
+    def focus_in(evt: Union[event.FocusIn, None]) -> None:
         """Prints message about the window that got focus."""
+        if evt is None:
+            return
         cls = evt.window.get_wm_class() or ("", "")
         print(
             'Got  focus on window 0x{:07x} ({:s}) "{:s}"'.format(
@@ -171,8 +174,10 @@ if __name__ == "__main__":
             )
         )
 
-    def focus_out(evt: display.event.FocusOut) -> None:
+    def focus_out(evt: Union[event.FocusOut, None]) -> None:
         """Prints message about the window that lost focus."""
+        if evt is None:
+            return
         cls = evt.window.get_wm_class() or ("", "")
         print(
             'Lost focus on window 0x{:07x} ({:s}) "{:s}"'.format(

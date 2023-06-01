@@ -378,7 +378,11 @@ class MainWindow(QMainWindow):  # type: ignore[misc]
         # python-xlib has get_wm_name() and get_wm_class(), but they only work
         # with ASCII encoded strings (STRING). Some programs put UTF-8 strings
         # in those properties, so we use AnyPropertyType (the default) instead.
-        window_title = "^" + re.escape(win.get_full_text_property(Xatom.WM_NAME)) + "$"
+        raw_title = win.get_full_text_property(Xatom.WM_NAME)
+        if raw_title is not None:
+            window_title = "^" + re.escape(raw_title) + "$"
+        else:
+            window_title = ""
         # Some programs (e.g. Touhou 6 under wine) put UTF-8 labeled as latin1
         # in WM_CLASS, so try decoding it as UTF-8 first.
         prop = win.get_full_property(Xatom.WM_CLASS, X.AnyPropertyType)
