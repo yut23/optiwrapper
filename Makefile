@@ -5,7 +5,7 @@ LDFLAGS=-lX11
 CXX=clang++
 CXXFLAGS=$(CFLAGS) -std=c++20
 
-.PHONY: all clean ui
+.PHONY: all clean ui lint
 all: watch_focus myxdo.so myxdo_test ui
 ui: optiwrapper/configurator/ui/settingswindow.py
 
@@ -23,3 +23,7 @@ optiwrapper/configurator/ui/settingswindow.py: optiwrapper/configurator/Settings
 
 clean:
 	rm -f watch_focus myxdo.so myxdo_test optiwrapper/configurator/ui/*.py
+
+lint:
+	pylint optiwrapper
+	mypy optiwrapper
