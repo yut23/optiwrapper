@@ -240,7 +240,7 @@ def xdo_search_windows(
     desktop: Optional[int] = None,
     limit: int = 0,
     max_depth: int = -1,
-) -> List[window_t]:
+) -> List[int]:
     """
     Search for windows.
 
@@ -336,4 +336,5 @@ def xdo_search_windows(
     if make_xdo:
         xdo_free(xdo)
 
+    # indexing a pointer returns the enclosed value
     return [windowlist_ret[i] for i in range(nwindows_ret.value)]

@@ -13,8 +13,6 @@ from typing import Callable, Dict, Generator, Iterable, List, Union
 from proc.core import Process, find_processes
 from Xlib import X, display, error
 
-from .libxdo import window_t
-
 logger = logging.getLogger("optiwrapper")
 
 # Paths
@@ -26,7 +24,7 @@ running = True
 
 
 def watch_focus(
-    window_ids: Iterable[Union[int, window_t]],
+    window_ids: Iterable[int],
     focus_in_cb: Callable[[display.event.FocusIn], None],
     focus_out_cb: Callable[[display.event.FocusOut], None],
 ) -> Generator[int, None, None]:
