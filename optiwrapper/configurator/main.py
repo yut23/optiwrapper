@@ -51,7 +51,7 @@ class ConfigEntry:
             self.config = self._saved_config.copy()
 
 
-class ConfigModel(QAbstractListModel):
+class ConfigModel(QAbstractListModel):  # type: ignore[misc]
     def __init__(self, configs: Iterable[Config] = (), parent: Any = None):
         super().__init__(parent)
         self._entries: List[ConfigEntry] = []
@@ -125,7 +125,7 @@ class ConfigModel(QAbstractListModel):
         return QModelIndex()
 
 
-class MainWindow(QMainWindow):
+class MainWindow(QMainWindow):  # type: ignore[misc]
     def __init__(self):
         super().__init__()
         # used to disable update signals while we're in the middle of switching games

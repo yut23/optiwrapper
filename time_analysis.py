@@ -4,15 +4,22 @@ Analyzes playtime logs.
 """
 
 import datetime
+import enum
 import functools
 import operator
 import sys
-from enum import Enum
 from typing import List, NamedTuple, Optional
 
 from optiwrapper.lib import WRAPPER_DIR
 
-EventType = Enum("EventType", "START LEAVE RETURN STOP")
+
+class EventType(enum.Enum):
+    START = enum.auto()
+    LEAVE = enum.auto()
+    RETURN = enum.auto()
+    STOP = enum.auto()
+
+
 START = EventType.START
 LEAVE = EventType.LEAVE
 RETURN = EventType.RETURN
@@ -94,7 +101,7 @@ def process(events: List[Event], print_invalid: bool = True) -> List[Segment]:
     if len(events) < 2:
         raise ValueError("Not enough data points!")
 
-    segments = list()
+    segments = []
     curr_evt = events[0]
     for line_num, next_evt in enumerate(events[1:], 2):
         if next_evt.event is None:

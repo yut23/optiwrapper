@@ -28,7 +28,6 @@ from .settings import Config
 
 
 class GpuType(enum.Enum):
-    # pylint: disable=missing-docstring
     UNKNOWN = enum.auto()
     INTEL = enum.auto()
     # INTEL_NOUVEAU = enum.auto()
@@ -116,7 +115,6 @@ TIME_LOGFILE = None
 
 
 class Event(enum.Enum):
-    # pylint: disable=missing-docstring
     START = enum.auto()
     STOP = enum.auto()
     UNFOCUS = enum.auto()
@@ -202,9 +200,7 @@ def setup_logfile(logfile: Any) -> None:
         LOGFILES.add(str(logpath))
 
 
-def get_config(
-    args: argparse.Namespace,  # pylint: disable=redefined-outer-name
-) -> Config:
+def get_config(args: argparse.Namespace) -> Config:
     """
     Constructs a configuration from the given arguments.
     """
@@ -330,7 +326,7 @@ class FocusThread(threading.Thread):
         logger.debug("waiting for window...")
         while closed_win > 0 and lib.running:
             xdo = xdo_new(None)
-            wins = xdo_search_windows(xdo, **self.kwargs)  # type: ignore
+            wins = xdo_search_windows(xdo, **self.kwargs)  # type: ignore[arg-type]
             window_start_time = time.time()
             while not wins and lib.running:
                 if time.time() > window_start_time + WINDOW_WAIT_TIME:
@@ -341,7 +337,7 @@ class FocusThread(threading.Thread):
                     )
                     sys.exit(1)
                 time.sleep(0.1)
-                wins = xdo_search_windows(xdo, **self.kwargs)  # type: ignore
+                wins = xdo_search_windows(xdo, **self.kwargs)  # type: ignore[arg-type]
             xdo_free(xdo)
             xdo = None
             if not lib.running:

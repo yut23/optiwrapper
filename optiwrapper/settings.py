@@ -14,16 +14,15 @@ from .lib import SETTINGS_DIR
 
 
 class ConfigFlags:
-    _defaults: ClassVar[Dict[str, bool]] = dict(
-        use_gpu=False,
-        fallback=True,
-        use_primus=True,
-        vsync=True,
-        is_64_bit=True,
-    )
+    _defaults: ClassVar[Dict[str, bool]] = {
+        "use_gpu": False,
+        "fallback": True,
+        "use_primus": True,
+        "vsync": True,
+        "is_64_bit": True,
+    }
 
     def __init__(self, **kwargs: bool):
-        # pylint: disable=too-many-arguments
         self._lookup: Dict[str, bool] = {}
         for key in self._defaults:
             if key in kwargs:

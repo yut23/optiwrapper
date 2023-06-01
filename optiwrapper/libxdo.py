@@ -175,7 +175,7 @@ _myxdo.xdo_search_windows.argtypes = (
     POINTER(c_uint),
 )
 _myxdo.xdo_search_windows.restype = c_int
-_myxdo.xdo_search_windows.errcheck = _errcheck_cb  # type: ignore
+_myxdo.xdo_search_windows.errcheck = _errcheck_cb
 _myxdo.xdo_search_windows.__doc__ = """\
 Search for windows.
 
@@ -197,7 +197,7 @@ _myxdo.xdo_select_window_with_click.argtypes = (
     POINTER(window_t),
 )
 _myxdo.xdo_select_window_with_click.restype = c_int
-_myxdo.xdo_select_window_with_click.errcheck = _errcheck_cb  # type: ignore
+_myxdo.xdo_select_window_with_click.errcheck = _errcheck_cb
 _myxdo.xdo_select_window_with_click.__doc__ = """\
 Get a window ID by clicking on it. This function blocks until a selection
 is made.
