@@ -266,7 +266,9 @@ def construct_command_line(
                 cmd_args.extend("-b primus".split())
     else:
         vk_icd_filenames = [
-            "radeon_icd.{}.json".format("x86_64" if config.flags.is_64_bit else "i686"),
+            "radeon_icd.x86_64.json",
+            "radeon_icd.i686.json",
+            # "radeon_icd.{}.json".format("x86_64" if config.flags.is_64_bit else "i686"),
             # "intel_icd.x86_64.json",
             # "intel_hasvk_icd.x86_64.json",
         ]
