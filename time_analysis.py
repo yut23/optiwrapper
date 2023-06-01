@@ -165,10 +165,12 @@ if __name__ == "__main__":
     all_segs = process(evts, verbose)
 
     run_time = functools.reduce(operator.add, (s.duration for s in running_segs))
+    run_hours = run_time.total_seconds() / 60 / 60
     active_time = functools.reduce(operator.add, (s.duration for s in all_segs))
-    print("Total run time:    {}".format(run_time))
+    active_hours = active_time.total_seconds() / 60 / 60
+    print("Total run time:    {} ({:.2f} hours)".format(run_time, run_hours))
     if any(e.event in (LEAVE, RETURN) for e in evts):
         msg = "active"
     else:
         msg = "run"
-    print("Total {} time: {}".format(msg, active_time))
+    print("Total {} time: {} ({:.2f} hours)".format(msg, active_time, active_hours))
