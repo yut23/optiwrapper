@@ -49,13 +49,13 @@ class Hook(WrapperHook):
                 args.extend(["-option", opt])
             run(["setxkbmap", *args], check=False)
 
-    def on_start(self) -> None:
+    async def on_start(self) -> None:
         pass
 
-    def on_focus(self) -> None:
+    async def on_focus(self) -> None:
         if self.enabled:
             self._set_options(self.modified)
 
-    def on_unfocus(self) -> None:
+    async def on_unfocus(self) -> None:
         if self.enabled:
             self._set_options(self.original)

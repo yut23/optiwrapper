@@ -19,11 +19,11 @@ class Hook(WrapperHook):
         self.fd = open(lock_file, "r")  # pylint: disable=consider-using-with
         fcntl.flock(self.fd, fcntl.LOCK_SH)
 
-    def on_start(self) -> None:
+    async def on_start(self) -> None:
         if self.enabled:
             run([touchpad_cmd, "off"], check=True)
 
-    def on_stop(self) -> None:
+    async def on_stop(self) -> None:
         fcntl.flock(self.fd, fcntl.LOCK_UN)
         self.fd.close()
         if self.enabled:

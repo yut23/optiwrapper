@@ -8,14 +8,17 @@ class Hook(WrapperHook):
     """Enable fullscreen unredirection (GNOME)"""
 
     def __init__(self) -> None:
-        self.enabled = gnome_shell_ext.is_extension_enabled(UUID)
+        self.enabled = False
 
-    def on_start(self) -> None:
+    async def initialize(self) -> None:
+        self.enabled = await gnome_shell_ext.is_extension_enabled(UUID)
+
+    async def on_start(self) -> None:
         if self.enabled:
             # enable fullscreen unredirection (removes intermittent stutter)
-            gnome_shell_ext.disable_extension(UUID)
+            await gnome_shell_ext.disable_extension(UUID)
 
-    def on_stop(self) -> None:
+    async def on_stop(self) -> None:
         if self.enabled:
             # disable fullscreen unredirection (fixes tearing in videos)
-            gnome_shell_ext.enable_extension(UUID)
+            await gnome_shell_ext.enable_extension(UUID)

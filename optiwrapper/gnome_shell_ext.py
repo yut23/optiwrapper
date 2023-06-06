@@ -3,40 +3,54 @@ Python implementation of gnome-extensions-tool.
 <https://gitlab.gnome.org/fmuellner/gnome-extensions-tool>
 """
 
-from gi.repository import GLib
-from pydbus import SessionBus
+from dbus_next import DBusError, Variant
+from dbus_next.aio import MessageBus, ProxyInterface
 
-bus = SessionBus()
+NAME = "org.gnome.Shell"
+PATH = "/org/gnome/Shell"
+INTERFACE = "org.gnome.Shell.Extensions"
 
 
-def enable_extension(uuid: str) -> None:
+async def get_shell() -> ProxyInterface:
+    bus = await MessageBus().connect()
+    introspection = await bus.introspect(NAME, PATH)
+    obj = bus.get_proxy_object(NAME, PATH, introspection)
+    return obj.get_interface(INTERFACE)
+
+
+async def enable_extension(uuid: str) -> None:
     """
     Enables the extension with `uuid`.
     """
     try:
-        shell = bus.get("org.gnome.Shell")
-        shell.EnableExtension(uuid)
-    except GLib.GError:
+        shell = await get_shell()
+        shell.call_enable_extension(uuid)  # type: ignore[attr-defined]
+    except DBusError:
         pass
 
 
-def disable_extension(uuid: str) -> None:
+async def disable_extension(uuid: str) -> None:
     """
     Disables the extension with `uuid`.
     """
     try:
-        shell = bus.get("org.gnome.Shell")
-        shell.DisableExtension(uuid)
-    except GLib.GError:
+        shell = await get_shell()
+        shell.call_disable_extension(uuid)  # type: ignore[attr-defined]
+    except DBusError:
         pass
 
 
-def is_extension_enabled(uuid: str) -> bool:
+async def is_extension_enabled(uuid: str) -> bool:
     """
     Returns True if the extension with `uuid` is enabled.
     """
     try:
-        shell = bus.get("org.gnome.Shell")
-        return bool(shell.GetExtensionInfo(uuid).get("state", -1) == 1)
-    except GLib.GError:
+        shell = await get_shell()
+        return bool(
+            (await shell.call_enable_extension(uuid))  # type: ignore[attr-defined]
+            .get("state", Variant("d", -1))
+            .value
+            == 1
+        )
+    except DBusError:
         return False

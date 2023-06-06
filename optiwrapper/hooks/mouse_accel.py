@@ -15,9 +15,9 @@ class Hook(WrapperHook):
             device, state = line.strip().split(": acceleration ")
             self.original_states[device] = state
 
-    def on_focus(self) -> None:
+    async def on_focus(self) -> None:
         run([TOOL, "off"], stdout=subprocess.DEVNULL, check=False)
 
-    def on_unfocus(self) -> None:
+    async def on_unfocus(self) -> None:
         for device, state in self.original_states.items():
             run([TOOL, state, device], stdout=subprocess.DEVNULL, check=False)

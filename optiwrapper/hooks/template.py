@@ -7,14 +7,17 @@ class Hook(WrapperHook):
     def __init__(self) -> None:
         pass
 
-    # def on_start(self) -> None:
-    #     self.on_focus()
+    # async def initialize(self) -> None:
+    #     pass
 
-    def on_focus(self) -> None:
+    # async def on_start(self) -> None:
+    #     await self.on_focus()
+
+    async def on_focus(self) -> None:
         pass
 
-    def on_unfocus(self) -> None:
+    async def on_unfocus(self) -> None:
         pass
 
-    # def on_stop(self) -> None:
-    #     self.on_unfocus()
+    # async def on_stop(self) -> None:
+    #     await self.on_unfocus()

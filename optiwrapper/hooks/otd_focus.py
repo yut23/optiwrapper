@@ -4,8 +4,8 @@ from . import otd
 class Hook(otd.Hook):
     """Change OTD settings while focused"""
 
-    def on_focus(self) -> None:
-        self.on_start()
+    async def on_focus(self) -> None:
+        await self.on_start()
 
-    def on_unfocus(self) -> None:
-        self.on_stop()
+    async def on_unfocus(self) -> None:
+        await self.on_stop()

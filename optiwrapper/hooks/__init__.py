@@ -70,18 +70,21 @@ def check_output(*args: Any, is_32_bit: bool = False, **kwargs: Any) -> str:
 
 
 class WrapperHook:
-    def on_start(self) -> None:
+    async def initialize(self) -> None:
+        """Will be called immediately after __init__."""
+
+    async def on_start(self) -> None:
         """Will be run when the game starts."""
-        self.on_focus()
+        await self.on_focus()
 
-    def on_stop(self) -> None:
+    async def on_stop(self) -> None:
         """Will be run when the game stops."""
-        self.on_unfocus()
+        await self.on_unfocus()
 
-    def on_focus(self) -> None:
+    async def on_focus(self) -> None:
         """Will be run when the game window gains focus."""
 
-    def on_unfocus(self) -> None:
+    async def on_unfocus(self) -> None:
         """Will be run when the game window loses focus."""
 
 
@@ -89,7 +92,7 @@ _REGISTERED_HOOKS: Dict[str, Type[WrapperHook]] = {}
 _LOADED_HOOKS: Dict[str, WrapperHook] = {}
 
 
-def load_hook(name: str) -> None:
+async def load_hook(name: str) -> None:
     if "=" in name:
         name, _args = name.split("=", maxsplit=1)
         args = _args.split(",")
@@ -98,6 +101,7 @@ def load_hook(name: str) -> None:
     if name not in _REGISTERED_HOOKS:
         raise ValueError(f"Hook not found: {name!r}")
     _LOADED_HOOKS[name] = _REGISTERED_HOOKS[name](*args)
+    await _LOADED_HOOKS[name].initialize()
     logger.debug("loaded hook %r", name)
 
 

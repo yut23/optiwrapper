@@ -29,7 +29,7 @@ class Hook(WrapperHook):
                     self.outputs.append(info.name)
         self.d.close()
 
-    def on_start(self) -> None:
+    async def on_start(self) -> None:
         # For some reason, just calling xrandr_change_output_property doesn't work,
         # so we'll let xrandr(1) do the heavy lifting.
         for output in self.outputs:
@@ -39,7 +39,7 @@ class Hook(WrapperHook):
                 check=False,
             )
 
-    def on_stop(self) -> None:
+    async def on_stop(self) -> None:
         for output in self.outputs:
             run(
                 ["xrandr", "--output", output, "--set", prop_name, "1"],

@@ -1,10 +1,11 @@
-from gi.repository import GLib
-from pydbus import SessionBus
+from dbus_next import DBusError
+from dbus_next.aio import MessageBus, ProxyInterface
 
 from . import WrapperHook
 
-bus = SessionBus()
-INTERFACE = "org.gnome.SettingsDaemon.Color"
+NAME = "org.gnome.SettingsDaemon.Color"
+PATH = "/org/gnome/SettingsDaemon/Color"
+INTERFACE = NAME
 
 
 class Hook(WrapperHook):
@@ -12,22 +13,31 @@ class Hook(WrapperHook):
 
     def __init__(self) -> None:
         self.enabled = False
+        self._color: ProxyInterface
+
+    async def initialize(self) -> None:
         try:
-            color = bus.get(INTERFACE)
-            self.enabled = color.NightLightActive and not color.DisabledUntilTomorrow
-        except GLib.GError:
+            bus = await MessageBus().connect()
+            introspection = await bus.introspect(NAME, PATH)
+            obj = bus.get_proxy_object(NAME, PATH, introspection)
+            self._color = obj.get_interface(INTERFACE)
+            self.enabled = (
+                await self._color.get_night_light_active()  # type: ignore[attr-defined]
+                and not await self._color.get_disabled_until_tomorrow()  # type: ignore[attr-defined]
+            )
+        except DBusError:
             pass
 
-    def on_start(self) -> None:
+    async def on_start(self) -> None:
         if self.enabled:
             try:
-                bus.get(INTERFACE).DisabledUntilTomorrow = True
-            except GLib.GError:
+                await self._color.set_disabled_until_tomorrow(False)  # type: ignore[attr-defined]
+            except DBusError:
                 pass
 
-    def on_stop(self) -> None:
+    async def on_stop(self) -> None:
         if self.enabled:
             try:
-                bus.get(INTERFACE).DisabledUntilTomorrow = False
-            except GLib.GError:
+                await self._color.set_disabled_until_tomorrow(False)  # type: ignore[attr-defined]
+            except DBusError:
                 pass

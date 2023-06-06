@@ -9,7 +9,7 @@ class Hook(WrapperHook):
 
     config_path = Path.home() / ".config/openbox/rc.xml"
 
-    def on_focus(self) -> None:
+    async def on_focus(self) -> None:
         tree = ET.parse(self.config_path)
         node = tree.find(
             "./focus/followMouse", namespaces={"": "http://openbox.org/3.4/rc"}
@@ -19,7 +19,7 @@ class Hook(WrapperHook):
             tree.write(self.config_path)
             run(["openbox", "--reconfigure"])
 
-    def on_unfocus(self) -> None:
+    async def on_unfocus(self) -> None:
         tree = ET.parse(self.config_path)
         node = tree.find(
             "./focus/followMouse", namespaces={"": "http://openbox.org/3.4/rc"}

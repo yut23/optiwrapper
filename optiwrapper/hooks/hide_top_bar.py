@@ -9,12 +9,14 @@ class Hook(WrapperHook):
 
     def __init__(self) -> None:
         self.enabled = True
-        self.enabled = not gnome_shell_ext.is_extension_enabled(UUID)
 
-    def on_start(self) -> None:
-        if self.enabled:
-            gnome_shell_ext.enable_extension(UUID)
+    async def initialize(self) -> None:
+        self.enabled = not await gnome_shell_ext.is_extension_enabled(UUID)
 
-    def on_stop(self) -> None:
+    async def on_start(self) -> None:
         if self.enabled:
-            gnome_shell_ext.disable_extension(UUID)
+            await gnome_shell_ext.enable_extension(UUID)
+
+    async def on_stop(self) -> None:
+        if self.enabled:
+            await gnome_shell_ext.disable_extension(UUID)
