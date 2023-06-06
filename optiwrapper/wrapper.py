@@ -492,6 +492,7 @@ class Main:  # pylint: disable=too-many-instance-attributes
     env_override: Dict[str, str]
     exit_code: ExitCode
     stop_event: asyncio.Event
+    subprocess_task: Optional[asyncio.Task[int]]
 
     def __init__(self, cfg: Config) -> None:
         self.cfg = cfg
@@ -520,6 +521,7 @@ class Main:  # pylint: disable=too-many-instance-attributes
         self.env_override = {}
         self.exit_code = ExitCode.SUCCESS
         self.stop_event = asyncio.Event()
+        self.subprocess_task = None
 
     async def finish_setup(self) -> None:
         # check if discrete GPU works, notify if not
@@ -657,6 +659,12 @@ class Main:  # pylint: disable=too-many-instance-attributes
         await self.started()
         try:
             await self._run_game()
+            if self.subprocess_task is not None:
+                self.subprocess_task.cancel()
+            # finish all pending background tasks
+            await asyncio.gather(
+                *asyncio.all_tasks() - {asyncio.current_task()}, return_exceptions=True
+            )
         finally:
             # try to make sure we write a stop event to the time log
             if lib.running:
@@ -668,11 +676,12 @@ class Main:  # pylint: disable=too-many-instance-attributes
             self.exit_code = exit_code
 
     # pylint 2.17.4 says asyncio.subprocess.Process doesn't exist
-    async def wait_for_process(self, process: "asyncio.subprocess.Process") -> None:
+    async def wait_for_process(self, process: "asyncio.subprocess.Process") -> int:
         logger.debug("waiting on subprocess %d", process.pid)
-        await process.wait()
+        returncode = await process.wait()
         logger.debug("subprocess %d done, exiting wrapper", process.pid)
         self.trigger_exit(ExitCode.SUCCESS)
+        return returncode
 
     async def _run_game(self) -> None:
         loop = asyncio.get_event_loop()
@@ -692,10 +701,12 @@ class Main:  # pylint: disable=too-many-instance-attributes
 
             if not self.cfg.process_name:
                 # just wait for subprocess to finish
-                create_background_task(self.wait_for_process(proc))
+                self.subprocess_task = create_background_task(
+                    self.wait_for_process(proc)
+                )
             else:
                 # wait on the launcher process in the background, to avoid zombies
-                create_background_task(proc.wait())
+                self.subprocess_task = create_background_task(proc.wait())
                 # find process
                 # TODO: do this in a separate thread
                 pattern = self.cfg.process_name
@@ -707,8 +718,10 @@ class Main:  # pylint: disable=too-many-instance-attributes
                         logger.error(
                             "Process not found within %d seconds", PROCESS_WAIT_TIME
                         )
-                        await notify("Failed to find game PID, quitting", logging.ERROR)
                         self.trigger_exit(ExitCode.NO_GAME_PROCESS)
+                        create_background_task(
+                            notify("Failed to find game PID, quitting", logging.ERROR)
+                        )
                         return
                     procs = pgrep(pattern)
                     logger.debug("found: %s", procs)
