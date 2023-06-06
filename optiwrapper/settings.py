@@ -110,6 +110,8 @@ class Config:
         # the command must be a valid executable
         program = self.command[0]
         if not os.path.isfile(program):
+            if os.sep not in program:
+                return f'The file "{program}" specified for command does not exist (it should be a full path).'
             return f'The file "{program}" specified for command does not exist.'
         if not os.access(program, os.X_OK):
             return f'The file "{program}" specified for command is not executable.'
