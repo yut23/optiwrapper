@@ -221,45 +221,6 @@ def setup_logfile(logfile: Any) -> None:
         LOGFILES.add(str(logpath))
 
 
-def get_config(args: argparse.Namespace) -> Config:
-    """
-    Constructs a configuration from the given arguments.
-    """
-    # order of configuration precedence, from highest to lowest:
-    #  1. command line parameters (<command>, --hide-top-bar, --no-discrete)
-    #  2. game configuration file (--game)
-
-    # parse game config file
-    assert args.game is not None
-    try:
-        config = Config.load(args.game)
-    except OSError:
-        logger.error(
-            'The configuration file for "%s" was not found in %s.',
-            args.game,
-            SETTINGS_DIR,
-        )
-        sys.exit(1)
-
-    setup_logfile(WRAPPER_DIR / "logs" / f"{config.game}.log")
-
-    # check arguments
-    if args.command:
-        # print('cli command:', args.command)
-        if config.command and config.command[0] != args.command[0]:
-            logger.warning("Different command given in config file and command line")
-        config.command = args.command
-
-    if args.use_gpu is not None:
-        config.flags.use_gpu = args.use_gpu
-
-    if args.hide_top_bar is not None:
-        if "hide_top_bar" not in config.hooks:
-            config.hooks.append("hide_top_bar")
-
-    return config
-
-
 def construct_command_line(
     config: Config, gpu_type: GpuType
 ) -> Tuple[List[str], Dict[str, str]]:
@@ -417,72 +378,6 @@ class FocusThread(threading.Thread):
             logger.debug("window closed")
 
 
-def parse_args() -> argparse.Namespace:
-    # command line arguments
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        add_help=False,
-        description=DESC,
-        epilog=EPILOG,
-    )
-    parser.add_argument(
-        "-h", "--help", help="show this help message and exit", nargs="?", const="help"
-    )
-    parser.add_argument(
-        "command",
-        metavar="COMMAND",
-        help="specify command to be run",
-        nargs=argparse.REMAINDER,
-    )
-    parser.add_argument(
-        "-G",
-        "--game",
-        metavar="GAME",
-        help="specify a game (will search for a config file)",
-    )
-    parser.add_argument(
-        "-f",
-        "--hide-top-bar",
-        help="hide the top bar (needed for fullscreen in some games)",
-        action="store_true",
-        default=None,
-    )
-    parser.add_argument(
-        "-d", "--debug", help="enable debugging output", action="store_true"
-    )
-    parser.add_argument(
-        "-n",
-        "--no-discrete",
-        help="don't use discrete graphics",
-        dest="use_gpu",
-        action="store_false",
-        default=None,
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        metavar="FILE",
-        help="log all output to a file (will overwrite, not append)",
-        dest="outfile",
-    )
-    parser.add_argument("-c", "--classname", help="window classname to match against")
-    parser.add_argument("-t", "--test", action="store_true")
-
-    args = parser.parse_args()
-
-    if args.help == "config":
-        print(CONFIG_HELP)
-        sys.exit(0)
-    elif args.help is not None:
-        parser.print_help()
-        sys.exit(0)
-
-    if args.game is None:
-        parser.error("the following arguments are required: -G/--game")
-
-    return args
-
-
 class Main:  # pylint: disable=too-many-instance-attributes
     cfg: Config
     gpu_type: GpuType
@@ -571,6 +466,120 @@ class Main:  # pylint: disable=too-many-instance-attributes
         )
         logger.debug("CWD: %s", Path().absolute())
 
+    async def run(self) -> None:
+        await self.finish_setup()
+        if self.stop_event.is_set():
+            return
+
+        async def cb_signal_handler(signame: str) -> None:
+            """
+            Write a message to both logs, then die.
+            """
+            await self.stopped(killed=True)
+            logger.error("Killed by external signal %s", signame)
+            self.trigger_exit(ExitCode.KILLED)
+
+        # clean up when killed by a signal
+        loop = asyncio.get_event_loop()
+        for signame in ("SIGINT", "SIGTERM"):
+            loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: create_background_task(
+                    cb_signal_handler(signame)
+                ),
+            )
+
+        await self.started()
+        try:
+            await self._run_game()
+            if self.subprocess_task is not None:
+                self.subprocess_task.cancel()
+            # finish all pending background tasks
+            await asyncio.gather(
+                *asyncio.all_tasks() - {asyncio.current_task()}, return_exceptions=True
+            )
+        finally:
+            # try to make sure we write a stop event to the time log
+            if lib.running:
+                await self.stopped()
+
+    async def _run_game(self) -> None:
+        loop = asyncio.get_event_loop()
+        # track focus
+        ft = FocusThread(self, loop)
+        ft.start()
+
+        watcher = asyncio.PidfdChildWatcher()
+        watcher.attach_loop(loop)
+        with watcher:
+            # run command
+            proc = await asyncio.create_subprocess_exec(
+                self.command[0],
+                *self.command[1:],
+                env={**os.environ, **self.env_override},
+            )
+
+            if not self.cfg.process_name:
+                # just wait for subprocess to finish
+                self.subprocess_task = create_background_task(
+                    self.wait_for_process(proc)
+                )
+            else:
+                # wait on the launcher process in the background, to avoid zombies
+                self.subprocess_task = create_background_task(proc.wait())
+                # find process
+                # TODO: do this in a separate thread
+                pattern = self.cfg.process_name
+                proc_start_time = time.time()
+                procs = pgrep(pattern)
+                logger.debug("found: %s", procs)
+                while len(procs) != 1:
+                    if time.time() > proc_start_time + PROCESS_WAIT_TIME:
+                        logger.error(
+                            "Process not found within %d seconds", PROCESS_WAIT_TIME
+                        )
+                        self.trigger_exit(ExitCode.NO_GAME_PROCESS)
+                        create_background_task(
+                            notify("Failed to find game PID, quitting", logging.ERROR)
+                        )
+                        return
+                    procs = pgrep(pattern)
+                    logger.debug("found: %s", procs)
+                    if len(procs) > 1:
+                        logger.error("Multiple matching processes:")
+                        for p in procs:
+                            logger.error("%s", p)
+                        self.trigger_exit(ExitCode.MULTIPLE_GAME_PROCESSES)
+                        return
+                    await asyncio.sleep(0.5)
+
+                # found single process to wait for
+                watcher.add_child_handler(
+                    procs[0].pid,
+                    lambda pid, returncode: self.trigger_exit(ExitCode.SUCCESS),
+                )
+
+        # the stop event will be set by one of the subprocess callbacks or by
+        # an error handler
+        await self.stop_event.wait()
+
+    # pylint 2.17.4 says asyncio.subprocess.Process doesn't exist
+    async def wait_for_process(self, process: "asyncio.subprocess.Process") -> int:
+        logger.debug("waiting on subprocess %d", process.pid)
+        returncode = await process.wait()
+        logger.debug("subprocess %d done, exiting wrapper", process.pid)
+        self.trigger_exit(ExitCode.SUCCESS)
+        return returncode
+
+    ##################
+    # event handlers #
+    ##################
+
+    def trigger_exit(self, exit_code: ExitCode) -> None:
+        if not self.stop_event.is_set():
+            self.stop_event.set()
+            self.exit_code = exit_code
+
     def log_time(self, event: Event, dt: Optional[arrow.Arrow] = None) -> None:
         """
         Writes a message to the time logfile, if one exists.
@@ -633,115 +642,110 @@ class Main:  # pylint: disable=too-many-instance-attributes
         for hook in hooks.get_loaded_hooks().values():
             await hook.on_unfocus()
 
-    async def run(self) -> None:
-        await self.finish_setup()
-        if self.stop_event.is_set():
-            return
 
-        async def cb_signal_handler(signame: str) -> None:
-            """
-            Write a message to both logs, then die.
-            """
-            await self.stopped(killed=True)
-            logger.error("Killed by external signal %s", signame)
-            self.trigger_exit(ExitCode.KILLED)
+def parse_args() -> argparse.Namespace:
+    # command line arguments
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False,
+        description=DESC,
+        epilog=EPILOG,
+    )
+    parser.add_argument(
+        "-h", "--help", help="show this help message and exit", nargs="?", const="help"
+    )
+    parser.add_argument(
+        "command",
+        metavar="COMMAND",
+        help="specify command to be run",
+        nargs=argparse.REMAINDER,
+    )
+    parser.add_argument(
+        "-G",
+        "--game",
+        metavar="GAME",
+        help="specify a game (will search for a config file)",
+    )
+    parser.add_argument(
+        "-f",
+        "--hide-top-bar",
+        help="hide the top bar (needed for fullscreen in some games)",
+        action="store_true",
+        default=None,
+    )
+    parser.add_argument(
+        "-d", "--debug", help="enable debugging output", action="store_true"
+    )
+    parser.add_argument(
+        "-n",
+        "--no-discrete",
+        help="don't use discrete graphics",
+        dest="use_gpu",
+        action="store_false",
+        default=None,
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        metavar="FILE",
+        help="log all output to a file (will overwrite, not append)",
+        dest="outfile",
+    )
+    parser.add_argument("-c", "--classname", help="window classname to match against")
+    parser.add_argument("-t", "--test", action="store_true")
 
-        # clean up when killed by a signal
-        loop = asyncio.get_event_loop()
-        for signame in ("SIGINT", "SIGTERM"):
-            loop.add_signal_handler(
-                getattr(signal, signame),
-                lambda signame=signame: create_background_task(
-                    cb_signal_handler(signame)
-                ),
-            )
+    args = parser.parse_args()
 
-        await self.started()
-        try:
-            await self._run_game()
-            if self.subprocess_task is not None:
-                self.subprocess_task.cancel()
-            # finish all pending background tasks
-            await asyncio.gather(
-                *asyncio.all_tasks() - {asyncio.current_task()}, return_exceptions=True
-            )
-        finally:
-            # try to make sure we write a stop event to the time log
-            if lib.running:
-                await self.stopped()
+    if args.help == "config":
+        print(CONFIG_HELP)
+        sys.exit(0)
+    elif args.help is not None:
+        parser.print_help()
+        sys.exit(0)
 
-    def trigger_exit(self, exit_code: ExitCode) -> None:
-        if not self.stop_event.is_set():
-            self.stop_event.set()
-            self.exit_code = exit_code
+    if args.game is None:
+        parser.error("the following arguments are required: -G/--game")
 
-    # pylint 2.17.4 says asyncio.subprocess.Process doesn't exist
-    async def wait_for_process(self, process: "asyncio.subprocess.Process") -> int:
-        logger.debug("waiting on subprocess %d", process.pid)
-        returncode = await process.wait()
-        logger.debug("subprocess %d done, exiting wrapper", process.pid)
-        self.trigger_exit(ExitCode.SUCCESS)
-        return returncode
+    return args
 
-    async def _run_game(self) -> None:
-        loop = asyncio.get_event_loop()
-        # track focus
-        ft = FocusThread(self, loop)
-        ft.start()
 
-        watcher = asyncio.PidfdChildWatcher()
-        watcher.attach_loop(loop)
-        with watcher:
-            # run command
-            proc = await asyncio.create_subprocess_exec(
-                self.command[0],
-                *self.command[1:],
-                env={**os.environ, **self.env_override},
-            )
+def get_config(args: argparse.Namespace) -> Config:
+    """
+    Constructs a configuration from the given arguments.
+    """
+    # order of configuration precedence, from highest to lowest:
+    #  1. command line parameters (<command>, --hide-top-bar, --no-discrete)
+    #  2. game configuration file (--game)
 
-            if not self.cfg.process_name:
-                # just wait for subprocess to finish
-                self.subprocess_task = create_background_task(
-                    self.wait_for_process(proc)
-                )
-            else:
-                # wait on the launcher process in the background, to avoid zombies
-                self.subprocess_task = create_background_task(proc.wait())
-                # find process
-                # TODO: do this in a separate thread
-                pattern = self.cfg.process_name
-                proc_start_time = time.time()
-                procs = pgrep(pattern)
-                logger.debug("found: %s", procs)
-                while len(procs) != 1:
-                    if time.time() > proc_start_time + PROCESS_WAIT_TIME:
-                        logger.error(
-                            "Process not found within %d seconds", PROCESS_WAIT_TIME
-                        )
-                        self.trigger_exit(ExitCode.NO_GAME_PROCESS)
-                        create_background_task(
-                            notify("Failed to find game PID, quitting", logging.ERROR)
-                        )
-                        return
-                    procs = pgrep(pattern)
-                    logger.debug("found: %s", procs)
-                    if len(procs) > 1:
-                        logger.error("Multiple matching processes:")
-                        for p in procs:
-                            logger.error("%s", p)
-                        self.trigger_exit(ExitCode.MULTIPLE_GAME_PROCESSES)
-                        return
-                    await asyncio.sleep(0.5)
+    # parse game config file
+    assert args.game is not None
+    try:
+        config = Config.load(args.game)
+    except OSError:
+        logger.error(
+            'The configuration file for "%s" was not found in %s.',
+            args.game,
+            SETTINGS_DIR,
+        )
+        sys.exit(1)
 
-                # found single process to wait for
-                watcher.add_child_handler(
-                    procs[0].pid,
-                    lambda pid, returncode: self.trigger_exit(ExitCode.SUCCESS),
-                )
+    setup_logfile(WRAPPER_DIR / "logs" / f"{config.game}.log")
 
-        # the stop event will be set by one of the subprocess callbacks or by
-        # an error handler
-        await self.stop_event.wait()
+    # check arguments
+    if args.command:
+        # print('cli command:', args.command)
+        if config.command and config.command[0] != args.command[0]:
+            logger.warning("Different command given in config file and command line")
+        config.command = args.command
+
+    if args.use_gpu is not None:
+        config.flags.use_gpu = args.use_gpu
+
+    if args.hide_top_bar is not None:
+        if "hide_top_bar" not in config.hooks:
+            config.hooks.append("hide_top_bar")
+
+    return config
 
 
 def run() -> NoReturn:
