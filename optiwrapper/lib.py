@@ -83,7 +83,7 @@ def watch_focus(
         disp.sync()
         err = ec.get_error()
         if err:
-            logger.error("Bad window ID: 0x{:x}".format(err.resource_id.id))
+            logger.error("Bad window ID: 0x%x", err.resource_id.id)
             yield -1
             return
         if win == focused:
