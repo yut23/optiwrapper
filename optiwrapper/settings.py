@@ -93,6 +93,8 @@ class Config:
         path = SETTINGS_DIR / f"{game}.yaml"
         with open(path) as f:
             data = yaml.safe_load(f)
+        if data is None:
+            data = {}
 
         if "flags" in data:
             data["flags"] = ConfigFlags(**data["flags"])
