@@ -24,6 +24,30 @@ SETTINGS_DIR = WRAPPER_DIR / "settings"
 running = True
 
 
+# implement os.pidfd_open using ctypes if it's not available
+# 2023-06-05: conda-forge's python is built on CentOS 7, which runs Linux 3.10
+if not hasattr(os, "pidfd_open"):
+    import platform
+
+    if platform.system() == "Linux" and tuple(
+        map(int, platform.release().partition("-")[0].split("."))
+    ) >= (5, 3, 0):
+        import ctypes
+
+        libc = ctypes.CDLL(None)
+        _syscall = libc.syscall
+
+        def _pidfd_open(pid, flags=0):
+            """Return a file descriptor referring to the process *pid*.
+
+            The descriptor can be used to perform process management without races and
+            signals.
+            """
+            return _syscall(434, pid, flags)
+
+        os.pidfd_open = _pidfd_open
+
+
 def watch_focus(
     window_ids: Iterable[int],
     focus_in_cb: Callable[[Union[event.FocusIn, None]], None],

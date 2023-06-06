@@ -5,7 +5,7 @@ playtime, and more.
 
 
 import argparse
-import atexit
+import asyncio
 import enum
 import logging
 import os
@@ -15,11 +15,23 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, NoReturn, Set, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Coroutine,
+    Dict,
+    List,
+    NoReturn,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 import arrow
-import notify2
-from notify2 import dbus
+import dbus_next
+import desktop_notify
 
 from . import hooks, lib
 from .lib import SETTINGS_DIR, WRAPPER_DIR, logger, pgrep, watch_focus
@@ -34,6 +46,15 @@ class GpuType(enum.Enum):
     NVIDIA = enum.auto()
     BUMBLEBEE = enum.auto()
     PRIME = enum.auto()
+
+
+class ExitCode(enum.Enum):
+    SUCCESS = 0
+    KILLED = 1
+    NO_GPU = 2
+    NO_GAME_WINDOW = 3
+    NO_GAME_PROCESS = 4
+    MULTIPLE_GAME_PROCESSES = 5
 
 
 # constants
@@ -280,7 +301,7 @@ def construct_command_line(
     return cmd_args, environ
 
 
-def notify(msg: str, level: int = logging.INFO, log: bool = False) -> None:
+async def notify(msg: str, level: int = logging.INFO, log: bool = False) -> None:
     icon = {
         logging.INFO: "dialog-information",
         logging.WARNING: "dialog-warning",
@@ -288,15 +309,39 @@ def notify(msg: str, level: int = logging.INFO, log: bool = False) -> None:
     }.get(level, "dialog-information")
     if log:
         logger.log(level, msg)
-    if notify2 is not None:
-        n = notify2.Notification("optiwrapper", msg, icon)
-        n.show()
+    try:
+        notification = desktop_notify.aio.Notify("optiwrapper")
+        notification.summary = "optiwrapper"
+        notification.body = msg
+        notification.icon = icon
+        await notification.show()
+    except dbus_next.DBusError:
+        pass
+
+
+_BACKGROUND_TASKS = set()
+
+_T = TypeVar("_T")
+
+
+def create_background_task(
+    coro: Coroutine[Any, Any, _T], *, name: Optional[str] = None
+) -> asyncio.Task[_T]:
+    task = asyncio.create_task(coro, name=name)
+    # Add task to the set. This creates a strong reference.
+    _BACKGROUND_TASKS.add(task)
+    # To prevent keeping references to finished tasks forever,
+    # make each task remove its own reference from the set after
+    # completion:
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
+    return task
 
 
 class FocusThread(threading.Thread):
-    def __init__(self, main: "Main"):
+    def __init__(self, main: "Main", loop: asyncio.AbstractEventLoop):
         super().__init__()
         self.main = main
+        self.loop = loop
         self.daemon = True
         self.kwargs: Dict[str, Union[bool, int, str]] = {
             "only_visible": True,
@@ -315,11 +360,14 @@ class FocusThread(threading.Thread):
         if not self.in_window_manager:
             logger.debug("not in WM")
 
+    def call_handler(self, handler: Callable[..., Coroutine[Any, Any, None]]) -> None:
+        self.loop.call_soon_threadsafe(create_background_task, handler(arrow.now()))
+
     def run(self) -> None:
         if not self.track_focus:
             return
         if not self.in_window_manager:
-            self.main.focused()
+            self.call_handler(self.main.focused)
             return
         logger.debug("in WM, tracking focus")
 
@@ -332,12 +380,18 @@ class FocusThread(threading.Thread):
             window_start_time = time.time()
             while not wins and lib.running:
                 if time.time() > window_start_time + WINDOW_WAIT_TIME:
-                    notify(
-                        f"Window not found within {WINDOW_WAIT_TIME} seconds",
-                        logging.ERROR,
-                        log=True,
+                    self.loop.call_soon_threadsafe(
+                        create_background_task,
+                        notify(
+                            f"Window not found within {WINDOW_WAIT_TIME} seconds",
+                            logging.ERROR,
+                            log=True,
+                        ),
                     )
-                    sys.exit(1)
+                    self.loop.call_soon_threadsafe(
+                        self.main.trigger_exit, ExitCode.NO_GAME_WINDOW
+                    )
+                    return
                 time.sleep(0.1)
                 wins = xdo_search_windows(xdo, **self.kwargs)  # type: ignore[arg-type]
             xdo_free(xdo)
@@ -355,21 +409,14 @@ class FocusThread(threading.Thread):
             closed_win = next(
                 watch_focus(
                     wins,
-                    lambda evt: self.main.focused(),
-                    lambda evt: self.main.unfocused(),
+                    lambda evt: self.call_handler(self.main.focused),
+                    lambda evt: self.call_handler(self.main.unfocused),
                 )
             )
             logger.debug("watch_focus returned %x", closed_win)
             time.sleep(0.1)
         if closed_win <= 0:
             logger.debug("window closed")
-
-
-# initialize notification system
-try:
-    notify2.init("optiwrapper")
-except dbus.exceptions.DBusException:
-    notify2 = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -438,59 +485,21 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-class Main:
-    def __init__(self) -> None:
-        # create console log handler and set level to debug, as the actual level
-        # selection is done in the logger
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-        ch.setFormatter(
-            logging.Formatter("{levelname:.1s}:{name}: {message}", style="{")
-        )
-        logger.addHandler(ch)
+class Main:  # pylint: disable=too-many-instance-attributes
+    cfg: Config
+    gpu_type: GpuType
+    time_logfile: Path
+    window_manager: str
+    command: List[str]
+    env_override: Dict[str, str]
+    exit_code: ExitCode
+    stop_event: asyncio.Event
 
-        args = parse_args()
-        # print(args)
+    def __init__(self, cfg: Config) -> None:
+        self.cfg = cfg
 
-        # setup logging
-        if args.debug:
-            logger.setLevel(logging.DEBUG)
-
-        if args.outfile is not None:
-            setup_logfile(args.outfile)
-
-        self.cfg = get_config(args)
-
-        cfg_err_msg = self.cfg.check()
-        if cfg_err_msg is not None:
-            logger.error(cfg_err_msg)
-            sys.exit(1)
-
-        gpu_type = get_gpu_type(needs_gpu=self.cfg.flags.use_gpu)
-        logger.debug("GPU: %s", gpu_type)
-
-        # check if discrete GPU works, notify if not
-        if self.cfg.flags.use_gpu and gpu_type not in (
-            GpuType.NVIDIA,
-            GpuType.BUMBLEBEE,
-            GpuType.PRIME,
-        ):
-            if self.cfg.flags.fallback:
-                notify(
-                    "Discrete GPU not working, falling back to integrated GPU",
-                    logging.ERROR,
-                    True,
-                )
-                self.cfg.flags.use_gpu = False
-            else:
-                notify("Discrete GPU not working, quitting", logging.ERROR, True)
-                sys.exit(1)
-
-        # if args.test:
-        #     print(dump_test_config(cfg))
-        #     sys.exit(0)
-
-        logger.debug("\n%s", self.cfg.pretty())
+        self.gpu_type = get_gpu_type(needs_gpu=self.cfg.flags.use_gpu)
+        logger.debug("GPU: %s", self.gpu_type)
 
         # setup time logging
         self.time_logfile = WRAPPER_DIR / f"time/{self.cfg.game}.log"
@@ -509,14 +518,46 @@ class Main:
         except IndexError:
             self.window_manager = ""
 
+        self.command = []
+        self.env_override = {}
+        self.exit_code = ExitCode.SUCCESS
+        self.stop_event = asyncio.Event()
+
+    async def finish_setup(self) -> None:
+        # check if discrete GPU works, notify if not
+        if self.cfg.flags.use_gpu and self.gpu_type not in (
+            GpuType.NVIDIA,
+            GpuType.BUMBLEBEE,
+            GpuType.PRIME,
+        ):
+            if self.cfg.flags.fallback:
+                await notify(
+                    "Discrete GPU not working, falling back to integrated GPU",
+                    logging.ERROR,
+                    True,
+                )
+                self.cfg.flags.use_gpu = False
+            else:
+                await notify("Discrete GPU not working, quitting", logging.ERROR, True)
+                self.trigger_exit(ExitCode.NO_GPU)
+                return
+
+        # if args.test:
+        #     print(dump_test_config(cfg))
+        #     sys.exit(0)
+
+        logger.debug("\n%s", self.cfg.pretty())
+
         # load hooks
         hooks.WINDOW_MANAGER = self.window_manager
         hooks.register_hooks()
         for hook_name in self.cfg.hooks:
-            hooks.load_hook(hook_name)
+            await hooks.load_hook(hook_name)
 
         # setup command
-        self.command, self.env_override = construct_command_line(self.cfg, gpu_type)
+        self.command, self.env_override = construct_command_line(
+            self.cfg, self.gpu_type
+        )
         logger.debug("Command: %s", repr(self.command))
 
         # remove overlay library for wrong architecture
@@ -524,10 +565,18 @@ class Main:
         if "LD_PRELOAD" in self.env_override:
             logger.debug('Fixed LD_PRELOAD: now "%s"', self.env_override["LD_PRELOAD"])
 
-    def log_time(self, event: Event) -> None:
+        logger.debug(
+            "env vars: %s",
+            " ".join(k + "=" + v for k, v in self.env_override.items()),
+        )
+        logger.debug("CWD: %s", Path().absolute())
+
+    def log_time(self, event: Event, dt: Union[arrow.Arrow, None] = None) -> None:
         """
         Writes a message to the time logfile, if one exists.
         """
+        if dt is None:
+            dt = arrow.now()
         message = {
             Event.START: "game started",
             Event.STOP: "game stopped",
@@ -536,112 +585,180 @@ class Main:
             Event.DIE: "wrapper died",
         }[event]
 
-        timestamp = arrow.now().format("YYYY-MM-DDTHH:mm:ss.SSSZZ")
+        timestamp = dt.format("YYYY-MM-DDTHH:mm:ss.SSSZZ")
         with open(self.time_logfile, "a") as logfile:
             logfile.write(f"{timestamp}: {message}\n")
 
-    def started(self) -> None:
+    async def started(self, dt: Union[arrow.Arrow, None] = None) -> None:
         """
         To be run when the game starts.
         """
         logger.debug("game starting...")
-        self.log_time(Event.START)
+        self.log_time(Event.START, dt)
         for hook in hooks.get_loaded_hooks().values():
-            hook.on_start()
+            await hook.on_start()
 
-    def stopped(self, killed: bool = False) -> None:
+    async def stopped(
+        self, dt: Union[arrow.Arrow, None] = None, killed: bool = False
+    ) -> None:
         """
         To be run after the game exits.
         """
         lib.running = False
         logger.debug("game stopped")
         if killed:
-            self.log_time(Event.DIE)
+            self.log_time(Event.DIE, dt)
         else:
-            self.log_time(Event.STOP)
+            self.log_time(Event.STOP, dt)
         for hook in hooks.get_loaded_hooks().values():
-            hook.on_stop()
+            await hook.on_stop()
 
-    def focused(self) -> None:
+    async def focused(self, dt: Union[arrow.Arrow, None] = None) -> None:
         """
         To be run when the game window is focused.
         """
         logger.debug("window focused")
         if lib.running:
-            self.log_time(Event.FOCUS)
+            self.log_time(Event.FOCUS, dt)
         for hook in hooks.get_loaded_hooks().values():
-            hook.on_focus()
+            await hook.on_focus()
 
-    def unfocused(self) -> None:
+    async def unfocused(self, dt: Union[arrow.Arrow, None] = None) -> None:
         """
         To be run when the game window loses focus.
         """
         logger.debug("window unfocused")
         if lib.running:
-            self.log_time(Event.UNFOCUS)
+            self.log_time(Event.UNFOCUS, dt)
         for hook in hooks.get_loaded_hooks().values():
-            hook.on_unfocus()
+            await hook.on_unfocus()
 
-    def run(self) -> NoReturn:
-        def cb_signal_handler(signum, frame):
+    async def run(self) -> None:
+        await self.finish_setup()
+        if self.stop_event.is_set():
+            return
+
+        async def cb_signal_handler(signame: str) -> None:
             """
             Write a message to both logs, then die.
             """
-            self.stopped(killed=True)
-            atexit.unregister(self.stopped)
-            logger.error("Killed by external signal %d", signum)
-            sys.exit(1)
+            await self.stopped(killed=True)
+            logger.error("Killed by external signal %s", signame)
+            self.trigger_exit(ExitCode.KILLED)
 
         # clean up when killed by a signal
-        signal.signal(signal.SIGTERM, cb_signal_handler)
-        signal.signal(signal.SIGINT, cb_signal_handler)
-        atexit.register(self.stopped)
-        self.started()
+        loop = asyncio.get_event_loop()
+        for signame in ("SIGINT", "SIGTERM"):
+            loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: create_background_task(
+                    cb_signal_handler(signame)
+                ),
+            )
 
-        # run command
-        logger.debug(
-            "env vars: %s",
-            " ".join(k + "=" + v for k, v in self.env_override.items()),
-        )
-        logger.debug("CWD: %s", Path().absolute())
-        # pylint: disable-next=consider-using-with
-        proc = subprocess.Popen(self.command, env={**os.environ, **self.env_override})
+        await self.started()
+        try:
+            await self._run_game()
+        finally:
+            # try to make sure we write a stop event to the time log
+            if lib.running:
+                await self.stopped()
+
+    def trigger_exit(self, exit_code: ExitCode) -> None:
+        if not self.stop_event.is_set():
+            self.stop_event.set()
+            self.exit_code = exit_code
+
+    # pylint 2.17.4 says asyncio.subprocess.Process doesn't exist
+    async def wait_for_process(self, process: "asyncio.subprocess.Process") -> None:
+        logger.debug("waiting on subprocess %d", process.pid)
+        await process.wait()
+        logger.debug("subprocess %d done, exiting wrapper", process.pid)
+        self.trigger_exit(ExitCode.SUCCESS)
+
+    async def _run_game(self) -> None:
+        loop = asyncio.get_event_loop()
         # track focus
-        ft = FocusThread(self)
+        ft = FocusThread(self, loop)
         ft.start()
 
-        if not self.cfg.process_name:
-            # just wait for subprocess to finish
-            logger.debug("waiting on subprocess %d", proc.pid)
-            proc.wait()
-            logger.debug("subprocess %d done, exiting wrapper", proc.pid)
-        else:
-            # find process
-            # time.sleep(2)
-            pattern = self.cfg.process_name
-            proc_start_time = time.time()
-            procs = pgrep(pattern)
-            logger.debug("found: %s", procs)
-            while len(procs) != 1:
-                if time.time() > proc_start_time + PROCESS_WAIT_TIME:
-                    logger.error(
-                        "Process not found within %d seconds", PROCESS_WAIT_TIME
-                    )
-                    notify("Failed to find game PID, quitting", logging.ERROR)
-                    sys.exit(1)
+        watcher = asyncio.PidfdChildWatcher()
+        watcher.attach_loop(loop)
+        with watcher:
+            # run command
+            proc = await asyncio.create_subprocess_exec(
+                self.command[0],
+                *self.command[1:],
+                env={**os.environ, **self.env_override},
+            )
+
+            if not self.cfg.process_name:
+                # just wait for subprocess to finish
+                create_background_task(self.wait_for_process(proc))
+            else:
+                # wait on the launcher process in the background, to avoid zombies
+                create_background_task(proc.wait())
+                # find process
+                # TODO: do this in a separate thread
+                pattern = self.cfg.process_name
+                proc_start_time = time.time()
                 procs = pgrep(pattern)
                 logger.debug("found: %s", procs)
-                if len(procs) > 1:
-                    logger.error("Multiple matching processes:")
-                    for p in procs:
-                        logger.error("%s", p)
-                    sys.exit(1)
-                time.sleep(0.5)
+                while len(procs) != 1:
+                    if time.time() > proc_start_time + PROCESS_WAIT_TIME:
+                        logger.error(
+                            "Process not found within %d seconds", PROCESS_WAIT_TIME
+                        )
+                        await notify("Failed to find game PID, quitting", logging.ERROR)
+                        self.trigger_exit(ExitCode.NO_GAME_PROCESS)
+                        return
+                    procs = pgrep(pattern)
+                    logger.debug("found: %s", procs)
+                    if len(procs) > 1:
+                        logger.error("Multiple matching processes:")
+                        for p in procs:
+                            logger.error("%s", p)
+                        self.trigger_exit(ExitCode.MULTIPLE_GAME_PROCESSES)
+                        return
+                    await asyncio.sleep(0.5)
 
-            # found single process to wait for
-            procs[0].wait_for_process(use_spinner=False)
-        sys.exit(0)
+                # found single process to wait for
+                watcher.add_child_handler(
+                    procs[0].pid,
+                    lambda pid, returncode: self.trigger_exit(ExitCode.SUCCESS),
+                )
+
+        # the stop event will be set by one of the subprocess callbacks or by
+        # an error handler
+        await self.stop_event.wait()
 
 
 def run() -> NoReturn:
-    Main().run()
+    # create console log handler and set level to debug, as the actual level
+    # selection is done in the logger
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    ch.setFormatter(logging.Formatter("{levelname:.1s}:{name}: {message}", style="{"))
+    logger.addHandler(ch)
+
+    args = parse_args()
+    # print(args)
+
+    # setup logging
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+
+    if args.outfile is not None:
+        setup_logfile(args.outfile)
+
+    cfg = get_config(args)
+
+    cfg_err_msg = cfg.check()
+    if cfg_err_msg is not None:
+        logger.error(cfg_err_msg)
+        sys.exit(1)
+
+    main = Main(cfg)
+
+    asyncio.run(main.run())
+    sys.exit(main.exit_code.value)
