@@ -100,9 +100,12 @@ async def load_hook(name: str) -> None:
         args = []
     if name not in _REGISTERED_HOOKS:
         raise ValueError(f"Hook not found: {name!r}")
-    _LOADED_HOOKS[name] = _REGISTERED_HOOKS[name](*args)
-    await _LOADED_HOOKS[name].initialize()
-    logger.debug("loaded hook %r", name)
+    if name not in _LOADED_HOOKS:
+        _LOADED_HOOKS[name] = _REGISTERED_HOOKS[name](*args)
+        await _LOADED_HOOKS[name].initialize()
+        logger.debug("loaded hook %r", name)
+    else:
+        logger.warning("hook %r already loaded", name)
 
 
 def get_loaded_hooks() -> Dict[str, WrapperHook]:
