@@ -310,10 +310,8 @@ async def notify(msg: str, level: int = logging.INFO, log: bool = False) -> None
     if log:
         logger.log(level, msg)
     try:
-        notification = desktop_notify.aio.Notify("optiwrapper")
-        notification.summary = "optiwrapper"
-        notification.body = msg
-        notification.icon = icon
+        server = desktop_notify.aio.Server("optiwrapper")
+        notification = server.Notify("optiwrapper", msg, icon)
         await notification.show()
     except dbus_next.DBusError:
         pass
