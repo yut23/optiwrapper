@@ -8,7 +8,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Callable, Dict, Generator, Iterable, List, Union
+from typing import Callable, Dict, Generator, Iterable, List, Optional
 
 from proc.core import Process, find_processes
 from Xlib import X, display, error
@@ -50,8 +50,8 @@ if not hasattr(os, "pidfd_open"):
 
 def watch_focus(
     window_ids: Iterable[int],
-    focus_in_cb: Callable[[Union[event.FocusIn, None]], None],
-    focus_out_cb: Callable[[Union[event.FocusOut, None]], None],
+    focus_in_cb: Callable[[Optional[event.FocusIn]], None],
+    focus_out_cb: Callable[[Optional[event.FocusOut]], None],
 ) -> Generator[int, None, None]:
     """Watches for focus changes and executes callbacks.
 
@@ -187,7 +187,7 @@ if __name__ == "__main__":
         X.NotifyDetailNone: "NotifyDetailNone",
     }
 
-    def focus_in(evt: Union[event.FocusIn, None]) -> None:
+    def focus_in(evt: Optional[event.FocusIn]) -> None:
         """Prints message about the window that got focus."""
         if evt is None:
             return
@@ -198,7 +198,7 @@ if __name__ == "__main__":
             )
         )
 
-    def focus_out(evt: Union[event.FocusOut, None]) -> None:
+    def focus_out(evt: Optional[event.FocusOut]) -> None:
         """Prints message about the window that lost focus."""
         if evt is None:
             return

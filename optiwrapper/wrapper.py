@@ -571,7 +571,7 @@ class Main:  # pylint: disable=too-many-instance-attributes
         )
         logger.debug("CWD: %s", Path().absolute())
 
-    def log_time(self, event: Event, dt: Union[arrow.Arrow, None] = None) -> None:
+    def log_time(self, event: Event, dt: Optional[arrow.Arrow] = None) -> None:
         """
         Writes a message to the time logfile, if one exists.
         """
@@ -589,7 +589,7 @@ class Main:  # pylint: disable=too-many-instance-attributes
         with open(self.time_logfile, "a") as logfile:
             logfile.write(f"{timestamp}: {message}\n")
 
-    async def started(self, dt: Union[arrow.Arrow, None] = None) -> None:
+    async def started(self, dt: Optional[arrow.Arrow] = None) -> None:
         """
         To be run when the game starts.
         """
@@ -599,7 +599,7 @@ class Main:  # pylint: disable=too-many-instance-attributes
             await hook.on_start()
 
     async def stopped(
-        self, dt: Union[arrow.Arrow, None] = None, killed: bool = False
+        self, dt: Optional[arrow.Arrow] = None, killed: bool = False
     ) -> None:
         """
         To be run after the game exits.
@@ -613,7 +613,7 @@ class Main:  # pylint: disable=too-many-instance-attributes
         for hook in hooks.get_loaded_hooks().values():
             await hook.on_stop()
 
-    async def focused(self, dt: Union[arrow.Arrow, None] = None) -> None:
+    async def focused(self, dt: Optional[arrow.Arrow] = None) -> None:
         """
         To be run when the game window is focused.
         """
@@ -623,7 +623,7 @@ class Main:  # pylint: disable=too-many-instance-attributes
         for hook in hooks.get_loaded_hooks().values():
             await hook.on_focus()
 
-    async def unfocused(self, dt: Union[arrow.Arrow, None] = None) -> None:
+    async def unfocused(self, dt: Optional[arrow.Arrow] = None) -> None:
         """
         To be run when the game window loses focus.
         """
