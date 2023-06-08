@@ -475,8 +475,8 @@ class Main:  # pylint: disable=too-many-instance-attributes
             """
             Write a message to both logs, then die.
             """
-            await self.stopped(killed=True)
             logger.error("Killed by external signal %s", signame)
+            await self.stopped(killed=True)
             self.trigger_exit(ExitCode.KILLED)
 
         # clean up when killed by a signal
