@@ -1,6 +1,6 @@
 import fcntl
 
-from . import WrapperHook, check_output, run
+from optiwrapper.hooks import WrapperHook, check_output, run
 
 touchpad_cmd = "/home/eric/bin/mandelbrot/touchpad"
 lock_file = "/var/lib/touchpad/disable.lock"

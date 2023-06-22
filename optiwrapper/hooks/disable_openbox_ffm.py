@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from . import WrapperHook, run
+from optiwrapper.hooks import WrapperHook, run
 
 
 class Hook(WrapperHook):

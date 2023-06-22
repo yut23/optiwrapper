@@ -1,4 +1,4 @@
-from . import WrapperHook, run
+from optiwrapper.hooks import WrapperHook, run
 
 
 class Hook(WrapperHook):

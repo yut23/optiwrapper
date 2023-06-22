@@ -34,10 +34,10 @@ import arrow
 import dbus_next
 import desktop_notify
 
-from . import hooks, lib
-from .lib import SETTINGS_DIR, WRAPPER_DIR, logger, pgrep, watch_focus
-from .libxdo import xdo_free, xdo_new, xdo_search_windows
-from .settings import Config
+from optiwrapper import hooks, lib
+from optiwrapper.lib import SETTINGS_DIR, WRAPPER_DIR, logger, pgrep, watch_focus
+from optiwrapper.libxdo import xdo_free, xdo_new, xdo_search_windows
+from optiwrapper.settings import Config
 
 
 class GpuType(enum.Enum):

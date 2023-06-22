@@ -1,6 +1,6 @@
 import subprocess
 
-from . import WrapperHook, check_output, run
+from optiwrapper.hooks import WrapperHook, check_output, run
 
 TOOL = "mouse-accel"
 

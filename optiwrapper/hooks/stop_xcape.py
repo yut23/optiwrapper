@@ -1,5 +1,5 @@
-from ..lib import pgrep
-from . import WrapperHook
+from optiwrapper.hooks import WrapperHook
+from optiwrapper.lib import pgrep
 
 
 class Hook(WrapperHook):

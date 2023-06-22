@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, Type
 
-from ..lib import remove_overlay
+from optiwrapper.lib import remove_overlay
 
 logger = logging.getLogger(__name__)
 WINDOW_MANAGER = ""

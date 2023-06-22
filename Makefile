@@ -25,6 +25,7 @@ clean:
 	rm -f watch_focus myxdo.so myxdo_test optiwrapper/configurator/ui/*.py
 
 lint:
+	isort --check optiwrapper
 	flake8 optiwrapper
 	mypy optiwrapper
 	pylint --disable=fixme optiwrapper

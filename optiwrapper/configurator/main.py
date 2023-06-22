@@ -11,11 +11,11 @@ from PySide2.QtGui import QKeySequence, QRegularExpressionValidator
 from PySide2.QtWidgets import QApplication, QListWidgetItem, QMainWindow
 from Xlib import X, Xatom, display
 
-from .. import hooks
-from ..lib import SETTINGS_DIR
-from ..libxdo import xdo_select_window_with_click
-from ..settings import Config
-from .ui.settingswindow import Ui_SettingsWindow
+from optiwrapper import hooks
+from optiwrapper.configurator.ui.settingswindow import Ui_SettingsWindow
+from optiwrapper.lib import SETTINGS_DIR
+from optiwrapper.libxdo import xdo_select_window_with_click
+from optiwrapper.settings import Config
 
 logger = logging.getLogger("optiwrapper.configurator")
 logger.setLevel(logging.DEBUG)

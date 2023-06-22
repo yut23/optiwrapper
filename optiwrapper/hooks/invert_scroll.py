@@ -1,6 +1,6 @@
 from Xlib import display
 
-from . import WrapperHook
+from optiwrapper.hooks import WrapperHook
 
 
 class Hook(WrapperHook):

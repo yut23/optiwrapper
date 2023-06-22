@@ -1,5 +1,5 @@
-from .. import gnome_shell_ext
-from . import WrapperHook
+from optiwrapper import gnome_shell_ext
+from optiwrapper.hooks import WrapperHook
 
 UUID = "unredirect@vaina.lt"
 

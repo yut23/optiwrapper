@@ -1,7 +1,7 @@
 from dbus_next import DBusError
 from dbus_next.aio import MessageBus, ProxyInterface
 
-from . import WrapperHook
+from optiwrapper.hooks import WrapperHook
 
 NAME = "org.gnome.SettingsDaemon.Color"
 PATH = "/org/gnome/SettingsDaemon/Color"

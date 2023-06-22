@@ -10,7 +10,7 @@ from typing import Any, ClassVar, Dict, List, Optional, Union
 
 import yaml
 
-from .lib import SETTINGS_DIR
+from optiwrapper.lib import SETTINGS_DIR
 
 
 class ConfigFlags:

@@ -2,7 +2,7 @@ from typing import Iterable, List
 
 from gi.repository import Gio
 
-from . import WINDOW_MANAGER, WrapperHook, run
+from optiwrapper.hooks import WINDOW_MANAGER, WrapperHook, run
 
 
 class Hook(WrapperHook):

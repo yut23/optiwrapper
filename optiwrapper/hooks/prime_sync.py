@@ -3,7 +3,7 @@ import subprocess
 from Xlib import X, display
 from Xlib.ext import randr
 
-from . import WrapperHook, run
+from optiwrapper.hooks import WrapperHook, run
 
 prop_name = "PRIME Synchronization"
 

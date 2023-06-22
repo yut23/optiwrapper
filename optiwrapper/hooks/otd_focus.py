@@ -1,4 +1,4 @@
-from . import otd
+from optiwrapper.hooks import otd
 
 
 class Hook(otd.Hook):
