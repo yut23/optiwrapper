@@ -1,0 +1,7 @@
+arrow
+dbus-next
+desktop-notify
+proc
+PySide2
+python-xlib
+PyYAML
