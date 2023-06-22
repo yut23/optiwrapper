@@ -651,6 +651,7 @@ class _Arguments:  # pylint: disable=too-many-instance-attributes
     game: str
     hide_top_bar: Optional[bool]
     debug: bool
+    quiet: bool
     use_gpu: Optional[bool]
     outfile: str
     classname: str
@@ -688,7 +689,18 @@ def parse_args() -> _Arguments:
         default=None,
     )
     parser.add_argument(
-        "-d", "--debug", help="enable debugging output", action="store_true"
+        "-d",
+        "--debug",
+        help="enable debugging output",
+        action="store_true",
+        default=True,
+    )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        help="disable debugging output",
+        dest="debug",
+        action="store_false",
     )
     parser.add_argument(
         "-n",
