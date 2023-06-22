@@ -14,6 +14,7 @@ import subprocess
 import sys
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Any,
@@ -643,7 +644,20 @@ class Main:  # pylint: disable=too-many-instance-attributes
             await hook.on_unfocus()
 
 
-def parse_args() -> argparse.Namespace:
+@dataclass(init=False)
+class _Arguments:  # pylint: disable=too-many-instance-attributes
+    help: Optional[str]
+    command: List[str]
+    game: str
+    hide_top_bar: Optional[bool]
+    debug: bool
+    use_gpu: Optional[bool]
+    outfile: str
+    classname: str
+    test: bool
+
+
+def parse_args() -> _Arguments:
     # command line arguments
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -694,7 +708,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-c", "--classname", help="window classname to match against")
     parser.add_argument("-t", "--test", action="store_true")
 
-    args = parser.parse_args()
+    args = parser.parse_args(namespace=_Arguments())
 
     if args.help == "config":
         print(CONFIG_HELP)
@@ -709,7 +723,7 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def get_config(args: argparse.Namespace) -> Config:
+def get_config(args: _Arguments) -> Config:
     """
     Constructs a configuration from the given arguments.
     """
