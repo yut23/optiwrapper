@@ -513,8 +513,10 @@ class Main:  # pylint: disable=too-many-instance-attributes
         return returncode
 
     async def find_process(
-        self, launcher: "asyncio.subprocess.Process", watcher: asyncio.PidfdChildWatcher
+        self, launcher: "asyncio.subprocess.Process", loop: asyncio.AbstractEventLoop
     ) -> int:
+        # wait on the launcher process in the background, to avoid zombies
+        launcher_task = create_background_task(launcher.wait())
         # find process by name
         pattern = self.cfg.process_name
         proc_start_time = time.time()
@@ -526,7 +528,7 @@ class Main:  # pylint: disable=too-many-instance-attributes
                 create_background_task(
                     notify("Failed to find game PID, quitting", logging.ERROR)
                 )
-                self.subprocess_task = create_background_task(launcher.wait())
+                self.subprocess_task = launcher_task
                 return -1
             procs = await asyncio.to_thread(pgrep, pattern)
             logger.debug("found: %s", procs)
@@ -535,19 +537,27 @@ class Main:  # pylint: disable=too-many-instance-attributes
                 for p in procs:
                     logger.error("%s", p)
                 self.trigger_exit(ExitCode.MULTIPLE_GAME_PROCESSES)
-                self.subprocess_task = create_background_task(launcher.wait())
+                self.subprocess_task = launcher_task
                 return -1
             await asyncio.sleep(0.5)
+
+        watcher = asyncio.PidfdChildWatcher()
+        watcher.attach_loop(loop)
+
+        process_fut: asyncio.Future[int] = loop.create_future()
 
         # found single process to wait for
         watcher.add_child_handler(
             procs[0].pid,
-            lambda pid, returncode: self.trigger_exit(ExitCode.SUCCESS),
+            lambda pid, returncode: process_fut.set_result(returncode),
         )
 
-        # wait on the launcher process, to avoid zombies
-        returncode = await launcher.wait()
-        self.subprocess_task = None
+        # wait on the launcher process, which exits before the game process
+        await launcher_task
+        # wait for the game process to exit
+        returncode = await process_fut
+
+        self.trigger_exit(ExitCode.SUCCESS)
         return returncode
 
     async def _run_game(self) -> None:
@@ -555,9 +565,6 @@ class Main:  # pylint: disable=too-many-instance-attributes
         # track focus
         ft = FocusThread(self, loop)
         ft.start()
-
-        watcher = asyncio.PidfdChildWatcher()
-        watcher.attach_loop(loop)
 
         # run command
         proc = await asyncio.create_subprocess_exec(
@@ -570,10 +577,8 @@ class Main:  # pylint: disable=too-many-instance-attributes
             # just wait for subprocess to finish
             self.subprocess_task = create_background_task(self.wait_for_process(proc))
         else:
-            # find process
-            self.subprocess_task = create_background_task(
-                self.find_process(proc, watcher)
-            )
+            # find main game process and wait for it to finish
+            self.subprocess_task = create_background_task(self.find_process(proc, loop))
 
         # the stop event will be set by one of the subprocess callbacks or by
         # an error handler
