@@ -512,6 +512,44 @@ class Main:  # pylint: disable=too-many-instance-attributes
         self.trigger_exit(ExitCode.SUCCESS)
         return returncode
 
+    async def find_process(
+        self, launcher: "asyncio.subprocess.Process", watcher: asyncio.PidfdChildWatcher
+    ) -> int:
+        # find process by name
+        pattern = self.cfg.process_name
+        proc_start_time = time.time()
+        procs: List[lib.Process] = []
+        while len(procs) != 1:
+            if time.time() > proc_start_time + PROCESS_WAIT_TIME:
+                logger.error("Process not found within %d seconds", PROCESS_WAIT_TIME)
+                self.trigger_exit(ExitCode.NO_GAME_PROCESS)
+                create_background_task(
+                    notify("Failed to find game PID, quitting", logging.ERROR)
+                )
+                self.subprocess_task = create_background_task(launcher.wait())
+                return -1
+            procs = await asyncio.to_thread(pgrep, pattern)
+            logger.debug("found: %s", procs)
+            if len(procs) > 1:
+                logger.error("Multiple matching processes:")
+                for p in procs:
+                    logger.error("%s", p)
+                self.trigger_exit(ExitCode.MULTIPLE_GAME_PROCESSES)
+                self.subprocess_task = create_background_task(launcher.wait())
+                return -1
+            await asyncio.sleep(0.5)
+
+        # found single process to wait for
+        watcher.add_child_handler(
+            procs[0].pid,
+            lambda pid, returncode: self.trigger_exit(ExitCode.SUCCESS),
+        )
+
+        # wait on the launcher process, to avoid zombies
+        returncode = await launcher.wait()
+        self.subprocess_task = None
+        return returncode
+
     async def _run_game(self) -> None:
         loop = asyncio.get_event_loop()
         # track focus
@@ -520,53 +558,22 @@ class Main:  # pylint: disable=too-many-instance-attributes
 
         watcher = asyncio.PidfdChildWatcher()
         watcher.attach_loop(loop)
-        with watcher:
-            # run command
-            proc = await asyncio.create_subprocess_exec(
-                self.command[0],
-                *self.command[1:],
-                env={**os.environ, **self.env_override},
+
+        # run command
+        proc = await asyncio.create_subprocess_exec(
+            self.command[0],
+            *self.command[1:],
+            env={**os.environ, **self.env_override},
+        )
+
+        if not self.cfg.process_name:
+            # just wait for subprocess to finish
+            self.subprocess_task = create_background_task(self.wait_for_process(proc))
+        else:
+            # find process
+            self.subprocess_task = create_background_task(
+                self.find_process(proc, watcher)
             )
-
-            if not self.cfg.process_name:
-                # just wait for subprocess to finish
-                self.subprocess_task = create_background_task(
-                    self.wait_for_process(proc)
-                )
-            else:
-                # wait on the launcher process in the background, to avoid zombies
-                self.subprocess_task = create_background_task(proc.wait())
-                # find process
-                # TODO: do this in a separate thread
-                pattern = self.cfg.process_name
-                proc_start_time = time.time()
-                procs = pgrep(pattern)
-                logger.debug("found: %s", procs)
-                while len(procs) != 1:
-                    if time.time() > proc_start_time + PROCESS_WAIT_TIME:
-                        logger.error(
-                            "Process not found within %d seconds", PROCESS_WAIT_TIME
-                        )
-                        self.trigger_exit(ExitCode.NO_GAME_PROCESS)
-                        create_background_task(
-                            notify("Failed to find game PID, quitting", logging.ERROR)
-                        )
-                        return
-                    procs = pgrep(pattern)
-                    logger.debug("found: %s", procs)
-                    if len(procs) > 1:
-                        logger.error("Multiple matching processes:")
-                        for p in procs:
-                            logger.error("%s", p)
-                        self.trigger_exit(ExitCode.MULTIPLE_GAME_PROCESSES)
-                        return
-                    await asyncio.sleep(0.5)
-
-                # found single process to wait for
-                watcher.add_child_handler(
-                    procs[0].pid,
-                    lambda pid, returncode: self.trigger_exit(ExitCode.SUCCESS),
-                )
 
         # the stop event will be set by one of the subprocess callbacks or by
         # an error handler
