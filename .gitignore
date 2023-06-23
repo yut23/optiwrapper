@@ -2,3 +2,4 @@
 /time
 watch_focus
 myxdo_test
+/optiwrapper/configurator/ui/*.py
