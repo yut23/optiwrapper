@@ -504,6 +504,14 @@ class Main:  # pylint: disable=too-many-instance-attributes
             if lib.running:
                 await self.stopped()
 
+    # pylint 2.17.4 says asyncio.subprocess.Process doesn't exist
+    async def wait_for_process(self, process: "asyncio.subprocess.Process") -> int:
+        logger.debug("waiting on subprocess %d", process.pid)
+        returncode = await process.wait()
+        logger.debug("subprocess %d done, exiting wrapper", process.pid)
+        self.trigger_exit(ExitCode.SUCCESS)
+        return returncode
+
     async def _run_game(self) -> None:
         loop = asyncio.get_event_loop()
         # track focus
@@ -563,14 +571,6 @@ class Main:  # pylint: disable=too-many-instance-attributes
         # the stop event will be set by one of the subprocess callbacks or by
         # an error handler
         await self.stop_event.wait()
-
-    # pylint 2.17.4 says asyncio.subprocess.Process doesn't exist
-    async def wait_for_process(self, process: "asyncio.subprocess.Process") -> int:
-        logger.debug("waiting on subprocess %d", process.pid)
-        returncode = await process.wait()
-        logger.debug("subprocess %d done, exiting wrapper", process.pid)
-        self.trigger_exit(ExitCode.SUCCESS)
-        return returncode
 
     ##################
     # event handlers #
