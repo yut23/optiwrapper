@@ -1,14 +1,16 @@
 extern "C" {
 #include "myxdo.h"
 }
-#include <algorithm>
-#include <iostream>
-#include <set>
-#include <vector>
+#include <algorithm> // for set_difference
+#include <cstdlib>   // for free
+#include <iostream>  // for operator<<, endl, cout
+#include <iterator>  // for back_inserter
+#include <set>       // for operator!=, set
+#include <vector>    // for vector
 
 int main() {
-  xdo_t *xdo = xdo_new(NULL);
-  Window *windowlist = NULL;
+  xdo_t *xdo = xdo_new(nullptr);
+  Window *windowlist = nullptr;
   unsigned int nwindows;
   xdo_search_t search{
       .winclassname = "^osu!.exe$",
@@ -26,7 +28,7 @@ int main() {
   while (true) {
     xdo_search_windows(xdo, &search, &windowlist, &nwindows);
     curr_windows = std::set<Window>{windowlist, windowlist + nwindows};
-    free(windowlist);
+    std::free(windowlist);
 
     std::set_difference(curr_windows.begin(), curr_windows.end(),
                         prev_windows.begin(), prev_windows.end(),

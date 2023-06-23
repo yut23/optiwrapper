@@ -8,10 +8,8 @@
 #define __USE_XOPEN
 #endif /* __USE_XOPEN */
 
-#include <X11/X.h>
-#include <X11/Xlib.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include <X11/X.h>    // for Window
+#include <X11/Xlib.h> // for Display
 
 /**
  * @mainpage

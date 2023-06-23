@@ -8,18 +8,16 @@
 #endif /* _XOPEN_SOURCE */
 
 #include "myxdo.h"
-#include <X11/Xatom.h>
-#include <X11/Xlib.h>
-#include <X11/Xlibint.h>
-#include <X11/Xresource.h>
-#include <X11/Xutil.h>
-#include <X11/cursorfont.h>
-#include <X11/extensions/XTest.h>
-#include <regex.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <X11/Xatom.h>      // for XA_WINDOW
+#include <X11/Xlib.h>       // for XFree, False, XInternAtom, True, XSetErr...
+#include <X11/Xlibint.h>    // for _XDefaultError
+#include <X11/Xutil.h>      // for XClassHint, XGetClassHint, XTextProperty
+#include <X11/cursorfont.h> // for XC_crosshair
+#include <regex.h>          // for regfree, regexec, regex_t, regcomp, REG_...
+#include <stdarg.h>         // for va_end, va_list, va_start
+#include <stdio.h>          // for fprintf, stderr, vfprintf, perror
+#include <stdlib.h>         // for free, calloc, getenv, malloc, realloc
+#include <string.h>         // for memset
 
 static int compile_re(const char *pattern, regex_t *re);
 static int check_window_match(const xdo_t *xdo, Window wid,

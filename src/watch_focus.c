@@ -1,13 +1,10 @@
-#include <assert.h>
-#include <getopt.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <xdo.h>
-
-#include <X11/X.h>
-#include <X11/Xutil.h>
+#include <X11/X.h>     // for Window, NotifyNormal, NotifyWhileGrabbed, Not...
+#include <X11/Xlib.h>  // for XFocusOutEvent, XFocusInEvent, XCloseDisplay
+#include <X11/Xutil.h> // for XGetClassHint, XClassHint
+#include <getopt.h>    // for getopt_long, no_argument, option
+#include <stdio.h>     // for printf, fprintf, stderr
+#include <stdlib.h>    // for strtol, EXIT_FAILURE, EXIT_SUCCESS
+#include <unistd.h>    // for optind, NULL
 
 const char *usage = "Usage: %s window ids ...\n";
 
@@ -25,7 +22,7 @@ int watch_focus(Window windows[], int win_count) {
   }
 
   Window window;
-  int focused = -1;
+  Window focused = -1;
   int mode, detail;
   // main loop
   while (1) {
@@ -36,6 +33,7 @@ int watch_focus(Window windows[], int win_count) {
     case FocusIn:
       mode = ((XFocusInEvent *)&e)->mode;
       window = ((XFocusInEvent *)&e)->window;
+      // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
       detail = ((XFocusInEvent *)&e)->detail;
       if (focused != window &&
           (mode == NotifyNormal || mode == NotifyWhileGrabbed)) {
@@ -47,7 +45,7 @@ int watch_focus(Window windows[], int win_count) {
       mode = ((XFocusOutEvent *)&e)->mode;
       window = ((XFocusOutEvent *)&e)->window;
       detail = ((XFocusOutEvent *)&e)->detail;
-      if ((focused == window || focused == -1) &&
+      if ((focused == window || focused == -1UL) &&
           (mode == NotifyNormal || mode == NotifyWhileGrabbed) &&
           detail != NotifyInferior) {
         printf("unfocused %lx\n", window);
