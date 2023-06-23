@@ -499,6 +499,8 @@ class Main:  # pylint: disable=too-many-instance-attributes
             await self._run_game()
             if self.subprocess_task is not None:
                 self.subprocess_task.cancel()
+            if lib.running:
+                await self.stopped()
             # finish all pending background tasks
             await asyncio.gather(
                 *asyncio.all_tasks() - {asyncio.current_task()}, return_exceptions=True
@@ -512,7 +514,11 @@ class Main:  # pylint: disable=too-many-instance-attributes
     async def wait_for_process(self, process: "asyncio.subprocess.Process") -> int:
         logger.debug("waiting on subprocess %d", process.pid)
         returncode = await process.wait()
-        logger.debug("subprocess %d done, exiting wrapper", process.pid)
+        logger.debug(
+            "subprocess %d exited with return code %d; exiting wrapper",
+            process.pid,
+            returncode,
+        )
         self.trigger_exit(ExitCode.SUCCESS)
         return returncode
 
@@ -551,16 +557,15 @@ class Main:  # pylint: disable=too-many-instance-attributes
         process_fut: asyncio.Future[int] = loop.create_future()
 
         # found single process to wait for
+        logger.debug("waiting on process %d", procs[0].pid)
         watcher.add_child_handler(
             procs[0].pid,
             lambda pid, returncode: process_fut.set_result(returncode),
         )
 
-        # wait on the launcher process, which exits before the game process
-        await launcher_task
         # wait for the game process to exit
         returncode = await process_fut
-
+        logger.debug("process %d exited with return code %d", procs[0].pid, returncode)
         self.trigger_exit(ExitCode.SUCCESS)
         return returncode
 
