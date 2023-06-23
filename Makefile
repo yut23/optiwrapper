@@ -18,7 +18,11 @@ myxdo.so: src/myxdo.c
 myxdo_test: src/myxdo_test.cpp myxdo.so
 	$(CXX) $(CXXFLAGS) -L. -l:myxdo.so -Wl,-rpath '-Wl,$$ORIGIN' -o $@ $^
 
-optiwrapper/configurator/ui/settingswindow.py: optiwrapper/configurator/SettingsWindow.ui
+# create ui directory if it doesn't exist
+optiwrapper/configurator/ui:
+	mkdir -p $@
+
+optiwrapper/configurator/ui/settingswindow.py: optiwrapper/configurator/SettingsWindow.ui | optiwrapper/configurator/ui
 	uic -g python -o $@ $<
 
 clean:
