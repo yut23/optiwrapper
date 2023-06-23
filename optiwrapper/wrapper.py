@@ -33,6 +33,7 @@ from typing import (
 import arrow
 import dbus_next
 import desktop_notify
+import pyprctl
 
 from optiwrapper import hooks, lib
 from optiwrapper.lib import SETTINGS_DIR, WRAPPER_DIR, logger, pgrep, watch_focus
@@ -83,6 +84,9 @@ def handle_exception(exc_type, exc_value, exc_traceback):
 
 
 sys.excepthook = handle_exception
+
+
+pyprctl.set_child_subreaper(True)
 
 
 DESC = """
