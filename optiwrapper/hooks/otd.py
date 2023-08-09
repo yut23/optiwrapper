@@ -10,7 +10,11 @@ class Hook(WrapperHook):
         self.cfg_name = cfg_name
 
     async def on_start(self) -> None:
-        run(["otd", "load", self.cfg_name], check=False)
+        # this CLI command doesn't work:
+        # https://github.com/OpenTabletDriver/OpenTabletDriver/issues/2536
+        # run(["otd", "load", self.cfg_name], check=False)
+        pass
 
     async def on_stop(self) -> None:
-        run(["otd", "load", "desktop.json"], check=False)
+        # run(["otd", "load", "desktop.json"], check=False)
+        pass
