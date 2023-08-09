@@ -155,19 +155,21 @@ def pgrep(pattern: str, match_full: bool = False) -> List[Process]:
     return list(procs)
 
 
-def remove_overlay(is_64_bit: bool = False) -> Dict[str, str]:
+def clean_ld_preload(is_64_bit: bool) -> Dict[str, str]:
     if is_64_bit:
         bad_lib = "ubuntu12_32"
     else:
         bad_lib = "ubuntu12_64"
-    if bad_lib in os.environ.get("LD_PRELOAD", ""):
-        return {
-            "LD_PRELOAD": ":".join(
-                lib_
-                for lib_ in os.environ["LD_PRELOAD"].split(":")
-                if bad_lib not in lib_
-            ),
-        }
+    screensaver_fix = "sdl_block_screensaver_inhibit.so"
+
+    def is_good(entry: str) -> bool:
+        return bad_lib not in entry and screensaver_fix not in entry
+
+    orig_entries = os.environ.get("LD_PRELOAD", "").split(":")
+    cleaned_entries = list(filter(is_good, orig_entries))
+    if cleaned_entries != orig_entries:
+        # need to override the environment variable
+        return {"LD_PRELOAD": ":".join(cleaned_entries)}
     return {}
 
 

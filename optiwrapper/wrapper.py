@@ -460,8 +460,8 @@ class Main:  # pylint: disable=too-many-instance-attributes
         )
         logger.debug("Command: %s", repr(self.command))
 
-        # remove overlay library for wrong architecture
-        self.env_override.update(lib.remove_overlay(self.cfg.flags.is_64_bit))
+        # remove overlay library for wrong architecture and disable screensaver fix
+        self.env_override.update(lib.clean_ld_preload(self.cfg.flags.is_64_bit))
         if "LD_PRELOAD" in self.env_override:
             logger.debug('Fixed LD_PRELOAD: now "%s"', self.env_override["LD_PRELOAD"])
 

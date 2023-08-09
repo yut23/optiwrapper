@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, Type
 
-from optiwrapper.lib import remove_overlay
+from optiwrapper.lib import clean_ld_preload
 
 logger = logging.getLogger(__name__)
 WINDOW_MANAGER = ""
@@ -45,7 +45,7 @@ def run(
 
     The other arguments are the same as for the Popen constructor."""
     kwargs = kwargs.copy()
-    env_override = remove_overlay(not is_32_bit)
+    env_override = clean_ld_preload(not is_32_bit)
     if "env" in kwargs:
         kwargs["env"].update(env_override)
     else:
@@ -60,7 +60,7 @@ run.__doc__ = subprocess.run.__doc__
 
 def check_output(*args: Any, is_32_bit: bool = False, **kwargs: Any) -> str:
     kwargs = kwargs.copy()
-    env_override = remove_overlay(not is_32_bit)
+    env_override = clean_ld_preload(not is_32_bit)
     if "env" in kwargs:
         kwargs["env"].update(env_override)
     else:
