@@ -470,6 +470,12 @@ class Main:  # pylint: disable=too-many-instance-attributes
             " ".join(k + "=" + v for k, v in self.env_override.items()),
         )
         logger.debug("CWD: %s", Path().absolute())
+        if self.cfg.game == "Minecraft" and "INST_NAME" in os.environ:
+            logger.debug(
+                "PrismLauncher instance: %s (ID=%r)",
+                os.environ["INST_NAME"],
+                os.environ["INST_ID"],
+            )
 
     async def run(self) -> None:
         await self.finish_setup()
@@ -615,6 +621,9 @@ class Main:  # pylint: disable=too-many-instance-attributes
             Event.FOCUS: "user returned",
             Event.DIE: "wrapper died",
         }[event]
+
+        if self.cfg.game == "Minecraft" and "INST_ID" in os.environ:
+            message += f" (instance: {os.environ['INST_ID']})"
 
         timestamp = dt.format("YYYY-MM-DDTHH:mm:ss.SSSZZ")
         with open(self.time_logfile, "a") as logfile:
