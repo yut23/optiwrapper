@@ -280,7 +280,7 @@ async def notify(msg: str, level: int = logging.INFO, log: bool = False) -> None
         notification = server.Notify("optiwrapper", msg, icon)
         await notification.show()
     except dbus_next.DBusError:
-        pass
+        logger.exception("Displaying notification failed")
 
 
 _BACKGROUND_TASKS = set()
