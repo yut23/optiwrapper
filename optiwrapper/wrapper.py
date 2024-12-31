@@ -449,10 +449,14 @@ class Main:  # pylint: disable=too-many-instance-attributes
         logger.debug("\n%s", self.cfg.pretty())
 
         # load hooks
-        hooks.WINDOW_MANAGER = self.window_manager
         hooks.register_hooks()
         for hook_name in self.cfg.hooks:
-            await hooks.load_hook(hook_name)
+            await hooks.load_hook(
+                hook_name,
+                cfg=self.cfg,
+                gpu_type=self.gpu_type,
+                window_manager=self.window_manager,
+            )
 
         # setup command
         self.command, self.env_override = construct_command_line(

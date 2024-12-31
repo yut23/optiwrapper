@@ -1,5 +1,5 @@
-import glob
 import importlib
+import inspect
 import logging
 import os
 import subprocess
@@ -9,7 +9,10 @@ from typing import Any, Dict, Type
 from optiwrapper.lib import clean_ld_preload
 
 logger = logging.getLogger(__name__)
-WINDOW_MANAGER = ""
+
+
+class WrongWindowManagerError(Exception):
+    pass
 
 
 def run(
@@ -92,7 +95,11 @@ _REGISTERED_HOOKS: Dict[str, Type[WrapperHook]] = {}
 _LOADED_HOOKS: Dict[str, WrapperHook] = {}
 
 
-async def load_hook(name: str) -> None:
+async def load_hook(name: str, **kwargs: Any) -> None:
+    """The keyword arguments cfg, gpu_type, and window_manager (attributes from
+    optiwrapper.wrapper.Main) will be passed to each hook's __init__(), if
+    requested.
+    """
     if "=" in name:
         name, _args = name.split("=", maxsplit=1)
         args = _args.split(",")
@@ -101,7 +108,18 @@ async def load_hook(name: str) -> None:
     if name not in _REGISTERED_HOOKS:
         raise ValueError(f"Hook not found: {name!r}")
     if name not in _LOADED_HOOKS:
-        _LOADED_HOOKS[name] = _REGISTERED_HOOKS[name](*args)
+        hook_class = _REGISTERED_HOOKS[name]
+        sig = inspect.signature(hook_class, eval_str=False)
+        kws = {k: v for k, v in kwargs.items() if k in sig.parameters}
+        try:
+            _LOADED_HOOKS[name] = hook_class(*args, **kws)
+        except WrongWindowManagerError:
+            logger.debug(
+                "skipping hook %r: in wrong window manager %r",
+                name,
+                kwargs.get("window_manager"),
+            )
+            return
         await _LOADED_HOOKS[name].initialize()
         logger.debug("loaded hook %r", name)
     else:

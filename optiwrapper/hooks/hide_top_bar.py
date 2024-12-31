@@ -1,5 +1,5 @@
 from optiwrapper import gnome_shell_ext
-from optiwrapper.hooks import WrapperHook
+from optiwrapper.hooks import WrapperHook, WrongWindowManagerError
 
 UUID = "hidetopbar@mathieu.bidon.ca"
 
@@ -7,7 +7,9 @@ UUID = "hidetopbar@mathieu.bidon.ca"
 class Hook(WrapperHook):
     """Hide top panel (GNOME)"""
 
-    def __init__(self) -> None:
+    def __init__(self, window_manager: str) -> None:
+        if "GNOME" not in window_manager:
+            raise WrongWindowManagerError()
         self.enabled = True
 
     async def initialize(self) -> None:

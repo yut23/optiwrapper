@@ -2,7 +2,7 @@ from typing import Iterable, List
 
 from gi.repository import Gio
 
-from optiwrapper.hooks import WINDOW_MANAGER, WrapperHook, run
+from optiwrapper.hooks import WrapperHook, run
 
 
 class Hook(WrapperHook):
@@ -12,9 +12,9 @@ class Hook(WrapperHook):
     XKB_OPTIONS_KEY = "xkb-options"
     BAD_OPTION = "shift:both_capslock"
 
-    def __init__(self) -> None:
+    def __init__(self, window_manager: str) -> None:
         self.enabled = False
-        self.gnome = "GNOME" in WINDOW_MANAGER
+        self.gnome = "GNOME" in window_manager
         self.original: List[str]
         self.modified: List[str]
         if self.gnome:

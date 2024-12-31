@@ -1,13 +1,17 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from optiwrapper.hooks import WrapperHook, run
+from optiwrapper.hooks import WrapperHook, WrongWindowManagerError, run
 
 
 class Hook(WrapperHook):
     """Disable focus-follows-mouse (Openbox)"""
 
     config_path = Path.home() / ".config/openbox/rc.xml"
+
+    def __init__(self, window_manager: str) -> None:
+        if "Openbox" not in window_manager:
+            raise WrongWindowManagerError()
 
     async def on_focus(self) -> None:
         tree = ET.parse(self.config_path)

@@ -1,7 +1,7 @@
 from dbus_next import DBusError
 from dbus_next.aio import MessageBus, ProxyInterface
 
-from optiwrapper.hooks import WrapperHook
+from optiwrapper.hooks import WrapperHook, WrongWindowManagerError
 
 NAME = "org.gnome.SettingsDaemon.Color"
 PATH = "/org/gnome/SettingsDaemon/Color"
@@ -11,7 +11,9 @@ INTERFACE = NAME
 class Hook(WrapperHook):
     """Disable blue light filter (GNOME)"""
 
-    def __init__(self) -> None:
+    def __init__(self, window_manager: str) -> None:
+        if "GNOME" not in window_manager:
+            raise WrongWindowManagerError()
         self.enabled = False
         self._color: ProxyInterface
 

@@ -1,5 +1,5 @@
 from optiwrapper import gnome_shell_ext
-from optiwrapper.hooks import WrapperHook
+from optiwrapper.hooks import WrapperHook, WrongWindowManagerError
 
 UUID = "unredirect@vaina.lt"
 
@@ -7,7 +7,9 @@ UUID = "unredirect@vaina.lt"
 class Hook(WrapperHook):
     """Enable fullscreen unredirection (GNOME)"""
 
-    def __init__(self) -> None:
+    def __init__(self, window_manager: str) -> None:
+        if "GNOME" not in window_manager:
+            raise WrongWindowManagerError()
         self.enabled = False
 
     async def initialize(self) -> None:
