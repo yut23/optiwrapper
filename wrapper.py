@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/eric/mambaforge/envs/main/bin/python3
 import optiwrapper
 
 if __name__ == "__main__":
