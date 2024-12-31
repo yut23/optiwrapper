@@ -3,3 +3,4 @@ flags:
 window_class: little\ kitty,\ big\ city\.exe
 hooks:
 - stop_xcape
+- inhibit_screensaver
