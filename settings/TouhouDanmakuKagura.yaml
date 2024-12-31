@@ -1,0 +1,3 @@
+window_class: steam_app_2190220
+hooks:
+- disable_touchpad

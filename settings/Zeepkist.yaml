@@ -1,0 +1,5 @@
+flags:
+  use_gpu: true
+window_class: steam_app_1440670
+hooks:
+- stop_xcape
