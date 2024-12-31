@@ -1,0 +1,5 @@
+flags:
+  use_gpu: true
+window_class: little\ kitty,\ big\ city\.exe
+hooks:
+- stop_xcape
