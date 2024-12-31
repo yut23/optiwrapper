@@ -1,8 +1,12 @@
+import logging
+
 from dbus_next import DBusError
 from dbus_next.aio import MessageBus, ProxyInterface
 
 from optiwrapper.hooks import WrapperHook
 from optiwrapper.settings import Config
+
+logger = logging.getLogger(__name__)
 
 NAME = "org.freedesktop.ScreenSaver"
 PATH = "/org/freedesktop/ScreenSaver"
@@ -28,17 +32,24 @@ class Hook(WrapperHook):
 
     async def on_focus(self) -> None:
         if self._screensaver is not None:
+            if self.cookie is not None:
+                logger.info(
+                    "doing manual unfocus call to avoid leaking an inhibit request"
+                )
+                await self.on_unfocus()
             application_name = "optiwrapper"
             reason = f"playing {self.game}"
             try:
-                self.cookie = await self._screensaver.inhibit(application_name, reason)  # type: ignore[attr-defined]
+                self.cookie = await self._screensaver.call_inhibit(  # type: ignore[attr-defined]
+                    application_name, reason
+                )
             except DBusError:
                 self.cookie = None
 
     async def on_unfocus(self) -> None:
         if self._screensaver is not None and self.cookie is not None:
             try:
-                await self._screensaver.uninhibit(self.cookie)  # type: ignore[attr-defined]
+                await self._screensaver.call_un_inhibit(self.cookie)  # type: ignore[attr-defined]
             except DBusError:
                 pass
             finally:
