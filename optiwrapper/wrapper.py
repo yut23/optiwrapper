@@ -474,6 +474,12 @@ class Main:  # pylint: disable=too-many-instance-attributes
             " ".join(k + "=" + v for k, v in self.env_override.items()),
         )
         logger.debug("CWD: %s", Path().absolute())
+        logger.debug(
+            "LD_LIBRARY_PATH: %s",
+            self.env_override.get(
+                "LD_LIBRARY_PATH", os.environ.get("LD_LIBRARY_PATH", "")
+            ),
+        )
         if self.cfg.game == "Minecraft" and "INST_NAME" in os.environ:
             logger.debug(
                 "PrismLauncher instance: %s (ID=%r)",
