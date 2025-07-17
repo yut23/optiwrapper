@@ -87,6 +87,7 @@ class Config:
     window_title: str = ""
     window_class: str = ""
     hooks: List[str] = field(default_factory=list)
+    env_override: Dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def load(cls, game: str) -> "Config":

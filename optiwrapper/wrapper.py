@@ -418,7 +418,7 @@ class Main:  # pylint: disable=too-many-instance-attributes
             self.window_manager = ""
 
         self.command = []
-        self.env_override = {}
+        self.env_override = cfg.env_override.copy()
         self.exit_code = ExitCode.SUCCESS
         self.stop_event = asyncio.Event()
         self.subprocess_task = None
@@ -459,9 +459,8 @@ class Main:  # pylint: disable=too-many-instance-attributes
             )
 
         # setup command
-        self.command, self.env_override = construct_command_line(
-            self.cfg, self.gpu_type
-        )
+        self.command, env_override = construct_command_line(self.cfg, self.gpu_type)
+        self.env_override.update(env_override)
         logger.debug("Command: %s", repr(self.command))
 
         # remove overlay library for wrong architecture and disable screensaver fix
@@ -694,6 +693,7 @@ class _Arguments:  # pylint: disable=too-many-instance-attributes
     quiet: bool
     use_gpu: Optional[bool]
     outfile: str
+    env: List[str]
     classname: str
     test: bool
 
@@ -757,6 +757,12 @@ def parse_args() -> _Arguments:
         help="log all output to a file (will overwrite, not append)",
         dest="outfile",
     )
+    parser.add_argument(
+        "--env",
+        metavar="VAR=VALUE",
+        help="override an environment variable when running the game (may be passed multiple times)",
+        action="append",
+    )
     parser.add_argument("-c", "--classname", help="window classname to match against")
     parser.add_argument("-t", "--test", action="store_true")
 
@@ -771,6 +777,11 @@ def parse_args() -> _Arguments:
 
     if args.game is None:
         parser.error("the following arguments are required: -G/--game")
+
+    if args.env is not None:
+        for entry in args.env:
+            if "=" not in entry:
+                parser.error(f"invalid argument to --env: {entry!r}")
 
     return args
 
@@ -810,6 +821,11 @@ def get_config(args: _Arguments) -> Config:
     if args.hide_top_bar is not None:
         if "hide_top_bar" not in config.hooks:
             config.hooks.append("hide_top_bar")
+
+    if args.env is not None:
+        for entry in args.env:
+            key, _, value = entry.partition("=")
+            config.env_override[key] = value
 
     return config
 
