@@ -1,6 +1,6 @@
 flags:
   use_gpu: true
-window_class: little\ kitty,\ big\ city\.exe
+window_class: steam_app_1177980
 hooks:
 - stop_xcape
 - inhibit_screensaver

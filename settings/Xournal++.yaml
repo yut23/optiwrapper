@@ -1,5 +1,5 @@
 command:
 - /usr/bin/xournalpp
-window_class: xournalpp
+window_class: com\.github\.xournalpp\.xournalpp
 hooks:
 - otd_focus=xournalpp.json

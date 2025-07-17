@@ -1,0 +1,3 @@
+window_class: steam_app_2180700
+hooks:
+- stop_xcape

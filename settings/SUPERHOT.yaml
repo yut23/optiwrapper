@@ -1,0 +1,5 @@
+flags:
+  use_gpu: true
+window_class: SUPERHOT\.x86_64
+hooks:
+- stop_xcape
