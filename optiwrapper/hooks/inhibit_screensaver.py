@@ -25,6 +25,7 @@ class Hook(WrapperHook):
         try:
             bus = await MessageBus().connect()
             introspection = await bus.introspect(NAME, PATH)
+            logger.info("%s", introspection)
             obj = bus.get_proxy_object(NAME, PATH, introspection)
             self._screensaver = obj.get_interface(INTERFACE)
         except DBusError:
@@ -43,14 +44,15 @@ class Hook(WrapperHook):
                 self.cookie = await self._screensaver.call_inhibit(  # type: ignore[attr-defined]
                     application_name, reason
                 )
-            except DBusError:
+            except DBusError as exc:
+                logger.warning("inhibit failed", exc_info=exc)
                 self.cookie = None
 
     async def on_unfocus(self) -> None:
         if self._screensaver is not None and self.cookie is not None:
             try:
                 await self._screensaver.call_un_inhibit(self.cookie)  # type: ignore[attr-defined]
-            except DBusError:
-                pass
+            except DBusError as exc:
+                logger.warning("uninhibit failed", exc_info=exc)
             finally:
                 self.cookie = None
