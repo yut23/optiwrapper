@@ -87,6 +87,7 @@ class Config:
     process_name: str = ""
     window_title: str = ""
     window_class: str = ""
+    proc_wait_time: float = 20
     hooks: List[str] = field(default_factory=list)
     env_override: Dict[str, str] = field(default_factory=dict)
 
@@ -156,7 +157,9 @@ class Config:
             self.process_name,
             self.window_title,
             self.window_class,
+            self.proc_wait_time,
             self.hooks.copy(),
+            self.env_override.copy(),
         )
 
     def pretty(self) -> str:

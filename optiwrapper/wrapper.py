@@ -548,8 +548,10 @@ class Main:  # pylint: disable=too-many-instance-attributes
         proc_start_time = time.time()
         procs: List[lib.Process] = []
         while len(procs) != 1:
-            if time.time() > proc_start_time + PROCESS_WAIT_TIME:
-                logger.error("Process not found within %d seconds", PROCESS_WAIT_TIME)
+            if time.time() > proc_start_time + self.cfg.proc_wait_time:
+                logger.error(
+                    "Process not found within %d seconds", self.cfg.proc_wait_time
+                )
                 self.trigger_exit(ExitCode.NO_GAME_PROCESS)
                 create_background_task(
                     notify("Failed to find game PID, quitting", logging.ERROR)
