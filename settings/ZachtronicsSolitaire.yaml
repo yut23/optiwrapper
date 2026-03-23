@@ -1,0 +1,3 @@
+window_class: TheZachtronicsSolitaireCollection\.bin\.x86_64
+hooks:
+- stop_xcape

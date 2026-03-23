@@ -1,4 +1,4 @@
 window_title: ^Silicon Zeroes$
 window_class: rawexec
-#hooks:
-#- stop_xcape
+hooks:
+- stop_xcape

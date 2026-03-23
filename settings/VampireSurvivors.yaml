@@ -1,1 +1,3 @@
-window_class: vampire_survivors
+window_class: (VampireSurvivors\.exe|vampire_survivors)
+hooks:
+- inhibit_screensaver

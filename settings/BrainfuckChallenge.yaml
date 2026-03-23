@@ -1,0 +1,3 @@
+window_class: BrainfuckChallenge
+hooks:
+- stop_xcape

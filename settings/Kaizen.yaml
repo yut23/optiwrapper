@@ -1,1 +1,3 @@
 window_class: Kaizen\.bin\.x86_64
+hooks:
+- stop_xcape
