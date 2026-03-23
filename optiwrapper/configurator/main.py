@@ -155,7 +155,13 @@ class MainWindow(QMainWindow):  # type: ignore[misc]
         self.ui.game_picker.setModel(self.model)
 
         # copy tooltips and status tips from text boxes to labels
-        for prop in ["command", "process_name", "window_title", "window_class"]:
+        for prop in [
+            "command",
+            "start_directory",
+            "process_name",
+            "window_title",
+            "window_class",
+        ]:
             label = getattr(self.ui, f"{prop}_label")
             textbox = getattr(self.ui, f"{prop}_textbox")
             label.setToolTip(textbox.toolTip())
@@ -167,6 +173,9 @@ class MainWindow(QMainWindow):  # type: ignore[misc]
 
         # wire up signals for settings panel
         self.ui.command_textbox.editingFinished.connect(self.command_changed)
+        self.ui.start_directory_textbox.editingFinished.connect(
+            self.start_directory_changed
+        )
         self.ui.process_name_textbox.editingFinished.connect(self.process_name_changed)
         self.ui.window_title_textbox.editingFinished.connect(self.window_title_changed)
         self.ui.window_class_textbox.editingFinished.connect(self.window_class_changed)
@@ -225,6 +234,7 @@ class MainWindow(QMainWindow):  # type: ignore[misc]
         # fill in new settings
         logger.debug("selection changed to %s", config.game)
         self.ui.command_textbox.setText(shlex.join(config.command))
+        self.ui.start_directory_textbox.setText(config.start_directory)
         self.ui.process_name_textbox.setText(config.process_name)
         self.ui.window_title_textbox.setText(config.window_title)
         self.ui.window_class_textbox.setText(config.window_class)
@@ -236,6 +246,7 @@ class MainWindow(QMainWindow):  # type: ignore[misc]
 
     def clear(self) -> None:
         self.ui.command_textbox.clear()
+        self.ui.start_directory_textbox.clear()
         self.ui.process_name_textbox.clear()
         self.ui.window_title_textbox.clear()
         self.ui.window_class_textbox.clear()
@@ -288,6 +299,16 @@ class MainWindow(QMainWindow):  # type: ignore[misc]
         if new_command != config.command:
             logger.debug("command changed to %r", text)
             config.command = new_command
+            self.mark_updated()
+
+    def start_directory_changed(self) -> None:
+        config = self.get_current_config()
+        if config is None:
+            return
+        text = self.ui.start_directory_textbox.text()
+        if text != config.start_directory:
+            logger.debug("start_directory changed to %r", text)
+            config.start_directory = text
             self.mark_updated()
 
     def process_name_changed(self) -> None:

@@ -95,6 +95,29 @@
            </widget>
           </item>
           <item row="1" column="0">
+           <widget class="QLabel" name="start_directory_label">
+            <property name="text">
+             <string>Directory</string>
+            </property>
+            <property name="buddy">
+             <cstring>start_directory_textbox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="start_directory_textbox">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The directory in which to run the command.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="statusTip">
+             <string>The directory in which to run the command.</string>
+            </property>
+            <property name="inputMethodHints">
+             <set>Qt::ImhNoAutoUppercase</set>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
            <widget class="QLabel" name="process_name_label">
             <property name="text">
              <string>Process name</string>
@@ -104,7 +127,7 @@
             </property>
            </widget>
           </item>
-          <item row="1" column="1">
+          <item row="2" column="1">
            <widget class="QLineEdit" name="process_name_textbox">
             <property name="toolTip">
              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The process name, for tracking when the game has exited.&lt;/p&gt;&lt;p&gt;Only needed if the initial process isn't the same as the actual game and it exits early (e.g. a launcher).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -117,7 +140,7 @@
             </property>
            </widget>
           </item>
-          <item row="2" column="0">
+          <item row="3" column="0">
            <widget class="QLabel" name="window_title_label">
             <property name="text">
              <string>Window title</string>
@@ -127,7 +150,7 @@
             </property>
            </widget>
           </item>
-          <item row="2" column="1">
+          <item row="3" column="1">
            <widget class="QLineEdit" name="window_title_textbox">
             <property name="toolTip">
              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Name of main game window (regular expression).&lt;/p&gt;&lt;p&gt;Can be found in the Alt-Tab menu or with &lt;code&gt;xprop WM_NAME.&lt;/code&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -140,7 +163,7 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="0">
+          <item row="4" column="0">
            <widget class="QLabel" name="window_class_label">
             <property name="text">
              <string>Window class</string>
@@ -150,7 +173,7 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="1">
+          <item row="4" column="1">
            <widget class="QLineEdit" name="window_class_textbox">
             <property name="toolTip">
              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Window classname of main game window (regex, must match exactly).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -163,7 +186,7 @@
             </property>
            </widget>
           </item>
-          <item row="4" column="1">
+          <item row="5" column="1">
            <widget class="QPushButton" name="fill_button">
             <property name="toolTip">
              <string>Left-click to select a window, right-click to cancel.</string>
@@ -277,6 +300,7 @@
   <tabstop>game_id_textbox</tabstop>
   <tabstop>add_game_button</tabstop>
   <tabstop>command_textbox</tabstop>
+  <tabstop>start_directory_textbox</tabstop>
   <tabstop>process_name_textbox</tabstop>
   <tabstop>window_title_textbox</tabstop>
   <tabstop>window_class_textbox</tabstop>

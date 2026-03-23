@@ -82,6 +82,7 @@ class ConfigFlags:
 class Config:
     game: str
     command: List[str] = field(default_factory=list)
+    start_directory: str = ""
     flags: ConfigFlags = field(default_factory=ConfigFlags)
     process_name: str = ""
     window_title: str = ""
@@ -150,6 +151,7 @@ class Config:
         return Config(
             self.game,
             self.command.copy(),
+            self.start_directory,
             self.flags.copy(),
             self.process_name,
             self.window_title,

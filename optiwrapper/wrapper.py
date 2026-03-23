@@ -205,6 +205,7 @@ def dump_test_config(config: Config) -> str:
     dump_flag("fallback")
     dump_flag("use_primus")
     dump_flag("vsync")
+    dump("start_directory")
     dump("process_name")
     dump("window_title")
     dump("window_class")
@@ -594,6 +595,7 @@ class Main:  # pylint: disable=too-many-instance-attributes
         proc = await asyncio.create_subprocess_exec(
             self.command[0],
             *self.command[1:],
+            cwd=self.cfg.start_directory or None,
             env={**os.environ, **self.env_override},
         )
 
